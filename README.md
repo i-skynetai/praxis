@@ -1,5 +1,10 @@
 # Praxis
 
+[![tests](https://github.com/arupmmi07/praxis/actions/workflows/tests.yml/badge.svg)](https://github.com/arupmmi07/praxis/actions/workflows/tests.yml)
+[![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![licence](https://img.shields.io/badge/licence-Apache%202.0-blue)](LICENSE)
+
+
 **Turn expensive frontier calls into a cheap specialised one.** Capture what the big
 model does at a typed seam, gate the traces for quality, distil a small student, and
 route by confidence with fallback when the student is unsure.
@@ -13,6 +18,11 @@ route by confidence with fallback when the student is unsure.
                     └──────── router ◄─────────────┘
                               student if confident · teacher if not
 ```
+
+## The shape
+
+![The flywheel: a seam inside the application, the teacher, capture, the gate, the
+student, and a router that picks between them](docs/images/flywheel.svg)
 
 ## The decision that shapes it
 
@@ -88,11 +98,15 @@ confidence is worse than no student, and deflection hides it.
 |---|---|
 | [Architecture](docs/architecture.md) | The five stages, and where each decision is made |
 | [Distillation](docs/distillation.md) | Wiring a real student, and what to measure first |
+| [Contributing](CONTRIBUTING.md) | Running the tests, and what a change needs |
+
 
 ## Status
 
-Python 3.11+, standard library only. **20 tests.** The LoRA backend is not wired in —
-see `docs/distillation.md`.
+Python 3.11+, standard library only. **20 tests**, run by CI on 3.11, 3.12 and 3.13.
+
+The LoRA backend is not wired in — see [docs/distillation.md](docs/distillation.md).
+`LoraStudent.fit` raises until it is, rather than quietly falling back.
 
 ## Licence
 

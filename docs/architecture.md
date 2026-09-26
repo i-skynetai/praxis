@@ -12,6 +12,9 @@ Five stages. Each one owns a single decision.
   6 evaluate   is the student worth deploying?
 ```
 
+
+![The five stages and the two paths through them](images/flywheel.svg)
+
 ## 1 · Seam
 
 A `Capability` is a name, an instruction and an output schema. The schema is the
