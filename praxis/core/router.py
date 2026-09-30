@@ -232,6 +232,8 @@ class DecisionRouter:
             except Exception as exc:  # noqa: BLE001 - recorded, then re-raised as TeacherError
                 teacher_error = f"teacher error: {type(exc).__name__}: {exc}"
             teacher_latency_ms = (time.perf_counter() - teacher_started) * 1000.0
+            if teacher_error is not None:
+                teacher_answers = {}          # nothing from a failed teacher is served or recorded as a label
 
         results, question_traces = self._assemble(request, assessed, served_by_system1, to_teacher, teacher_answers,
                                                   system1_call, teacher_latency_ms, trace_id, policy)

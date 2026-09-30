@@ -47,11 +47,12 @@ class FakeDecisionModel:
     """A System-1 that answers by a rule, or misbehaves on request.
 
     ``pick`` chooses the key per question (default: the first key). ``peak`` is the mass
-    put on it. ``fail`` is raised on every call. ``delay_s`` stalls each call, which is
+    put on it, one value for every question or a mapping by question name. ``fail`` is raised on every call. ``delay_s`` stalls each call, which is
     how a timeout is injected. ``malformed`` selects one of ``MALFORMED_MODES``.
     """
 
-    def __init__(self, pick: Picker | None = None, peak: float = 0.9, *, fail: BaseException | None = None,
+    def __init__(self, pick: Picker | None = None, peak: float | Mapping[str, float] = 0.9, *,
+                 fail: BaseException | None = None,
                  delay_s: float = 0.0, malformed: str | None = None, native_confidence: float | None = None,
                  cost_usd: float = 0.0, info: ModelInfo | None = None) -> None:
         if malformed is not None and malformed not in MALFORMED_MODES:
@@ -82,8 +83,9 @@ class FakeDecisionModel:
         for name, question in questions.items():
             keys = question.keys()
             key = self.pick(state, name, question) if self.pick else keys[0]
-            out[name] = RawAnswer(peaked(keys, key, self.peak),
-                                  self.peak if self.native_confidence is None else self.native_confidence,
+            peak = self.peak[name] if isinstance(self.peak, Mapping) else self.peak
+            out[name] = RawAnswer(peaked(keys, key, peak),
+                                  peak if self.native_confidence is None else self.native_confidence,
                                   self.cost_usd)
         return out
 
