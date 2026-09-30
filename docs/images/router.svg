@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="960" height="430" fill="#ffffff"/>
+  <text x="480" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#222">One decision call through the redesigned router</text>
+
+  <rect x="30" y="70" width="200" height="60" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+  <text x="130" y="94" text-anchor="middle" font-weight="bold" fill="#222">Capability call</text>
+  <text x="130" y="114" text-anchor="middle" fill="#444" font-size="13">state + typed questions</text>
+  <line x1="230" y1="100" x2="268" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <rect x="270" y="70" width="200" height="60" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="370" y="94" text-anchor="middle" font-weight="bold" fill="#222">System-1 model</text>
+  <text x="370" y="114" text-anchor="middle" fill="#444" font-size="13">any provider behind one port</text>
+  <line x1="470" y1="100" x2="508" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <rect x="510" y="70" width="200" height="60" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+  <text x="610" y="94" text-anchor="middle" font-weight="bold" fill="#222">Calibrator</text>
+  <text x="610" y="114" text-anchor="middle" fill="#444" font-size="13">one confidence scale for all</text>
+  <line x1="710" y1="100" x2="748" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- decision diamond -->
+  <polygon points="850,60 940,100 850,140 760,100" fill="#fff8e1" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="850" y="96" text-anchor="middle" font-size="13" fill="#222">confident</text>
+  <text x="850" y="112" text-anchor="middle" font-size="13" fill="#222">and valid?</text>
+
+  <!-- yes branch -->
+  <line x1="850" y1="140" x2="850" y2="190" stroke="#2e8b57" stroke-width="1.5" marker-end="url(#g)"/>
+  <text x="866" y="170" fill="#2e8b57" font-size="13">yes</text>
+  <rect x="750" y="192" width="200" height="60" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="850" y="216" text-anchor="middle" font-weight="bold" fill="#222">Serve the decision</text>
+  <text x="850" y="236" text-anchor="middle" fill="#444" font-size="13">milliseconds, local</text>
+
+  <!-- no branch -->
+  <line x1="760" y1="100" x2="740" y2="100" stroke="#c0392b" stroke-width="0"/>
+  <path d="M 850 140 L 850 160 L 610 160 L 610 190" fill="none" stroke="#c0392b" stroke-width="1.5" marker-end="url(#r)"/>
+  <text x="700" y="154" fill="#c0392b" font-size="13">no → abstain</text>
+  <rect x="510" y="192" width="200" height="60" rx="6" fill="#fde8e8" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="610" y="216" text-anchor="middle" font-weight="bold" fill="#222">System-2: teacher LLM</text>
+  <text x="610" y="236" text-anchor="middle" fill="#444" font-size="13">structured output, slower</text>
+  <line x1="710" y1="222" x2="748" y2="222" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- record -->
+  <line x1="850" y1="252" x2="850" y2="290" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="510" y="292" width="440" height="76" rx="6" fill="#f2f2f2" stroke="#888" stroke-width="1.5"/>
+  <text x="730" y="316" text-anchor="middle" font-weight="bold" fill="#222">Record the trace</text>
+  <text x="730" y="336" text-anchor="middle" fill="#444" font-size="13">who answered, distribution, confidence, latency</text>
+  <text x="730" y="354" text-anchor="middle" fill="#444" font-size="13">System-2 answers become the training labels</text>
+
+  <!-- governance note -->
+  <rect x="30" y="292" width="440" height="76" rx="6" fill="#fff8e1" stroke="#c9a227" stroke-width="1.2"/>
+  <text x="250" y="316" text-anchor="middle" font-weight="bold" fill="#222">Outside Praxis</text>
+  <text x="250" y="336" text-anchor="middle" fill="#444" font-size="13">Praxis only proposes a decision.</text>
+  <text x="250" y="354" text-anchor="middle" fill="#444" font-size="13">The host's own policy authorises the action.</text>
+
+  <text x="480" y="408" text-anchor="middle" fill="#666" font-size="13">Shadow mode: same path, but System-2 always serves and the System-1 answer is only compared and recorded.</text>
+
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+    <marker id="g" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#2e8b57"/></marker>
+    <marker id="r" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c0392b"/></marker>
+  </defs>
+</svg>

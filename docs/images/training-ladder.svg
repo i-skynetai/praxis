@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="960" height="420" fill="#ffffff"/>
+  <text x="480" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#222">The training ladder: cheapest rung that clears the gate wins</text>
+
+  <!-- axis hint -->
+  <text x="40" y="70" fill="#666" font-size="13">cheaper, faster</text>
+  <text x="920" y="70" text-anchor="end" fill="#666" font-size="13">stronger, costlier</text>
+  <line x1="40" y1="78" x2="920" y2="78" stroke="#bbb" stroke-width="1" marker-end="url(#a)"/>
+
+  <!-- rung A -->
+  <rect x="40" y="100" width="205" height="150" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="142" y="124" text-anchor="middle" font-weight="bold" fill="#222">A · Use as shipped</text>
+  <text x="142" y="148" text-anchor="middle" fill="#333" font-size="13">pretrained decision model,</text>
+  <text x="142" y="166" text-anchor="middle" fill="#333" font-size="13">zero-shot on your questions</text>
+  <text x="142" y="190" text-anchor="middle" fill="#333" font-size="13">+ Praxis temperature fit</text>
+  <text x="142" y="208" text-anchor="middle" fill="#333" font-size="13">on gated traces</text>
+  <text x="142" y="236" text-anchor="middle" fill="#2e8b57" font-size="13" font-weight="bold">minutes · no GPU</text>
+
+  <!-- rung B -->
+  <rect x="265" y="100" width="205" height="150" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="367" y="124" text-anchor="middle" font-weight="bold" fill="#222">B · Fit a head</text>
+  <text x="367" y="148" text-anchor="middle" fill="#333" font-size="13">closed-form head or</text>
+  <text x="367" y="166" text-anchor="middle" fill="#333" font-size="13">threshold fit on</text>
+  <text x="367" y="184" text-anchor="middle" fill="#333" font-size="13">100–300 labelled traces</text>
+  <text x="367" y="208" text-anchor="middle" fill="#333" font-size="13">(labels = gated System-2 answers)</text>
+  <text x="367" y="236" text-anchor="middle" fill="#2e8b57" font-size="13" font-weight="bold">seconds · no gradients</text>
+
+  <!-- rung C -->
+  <rect x="490" y="100" width="205" height="150" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+  <text x="592" y="124" text-anchor="middle" font-weight="bold" fill="#222">C · Fine-tune the model</text>
+  <text x="592" y="148" text-anchor="middle" fill="#333" font-size="13">encoder decision model</text>
+  <text x="592" y="166" text-anchor="middle" fill="#333" font-size="13">trained on the decision</text>
+  <text x="592" y="184" text-anchor="middle" fill="#333" font-size="13">dataset, then recalibrated</text>
+  <text x="592" y="208" text-anchor="middle" fill="#333" font-size="13">(published path: 2×T4, free tier)</text>
+  <text x="592" y="236" text-anchor="middle" fill="#2f6fd6" font-size="13" font-weight="bold">hours · small GPU</text>
+
+  <!-- rung D -->
+  <rect x="715" y="100" width="205" height="150" rx="6" fill="#f2f2f2" stroke="#888" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="817" y="124" text-anchor="middle" font-weight="bold" fill="#222">D · LoRA a small LLM</text>
+  <text x="817" y="148" text-anchor="middle" fill="#333" font-size="13">only for capabilities that</text>
+  <text x="817" y="166" text-anchor="middle" fill="#333" font-size="13">must generate text or code</text>
+  <text x="817" y="190" text-anchor="middle" fill="#333" font-size="13">the original Praxis path,</text>
+  <text x="817" y="208" text-anchor="middle" fill="#333" font-size="13">unchanged, behind the same port</text>
+  <text x="817" y="236" text-anchor="middle" fill="#666" font-size="13" font-weight="bold">hours · GPU or Apple MLX</text>
+
+  <!-- shared bar -->
+  <rect x="40" y="280" width="880" height="54" rx="6" fill="#fff8e1" stroke="#c9a227" stroke-width="1.2"/>
+  <text x="480" y="302" text-anchor="middle" font-weight="bold" fill="#222">Every rung shares the same gate, the same decision dataset, the same paired eval and the same registry</text>
+  <text x="480" y="322" text-anchor="middle" fill="#444" font-size="13">A model is promoted only when its scorecard clears the gate; the teacher stays the permanent fallback</text>
+
+  <text x="480" y="380" text-anchor="middle" fill="#666" font-size="13">Rungs A and B are new. They exist because System-1 models arrived with calibration and training paths built in.</text>
+
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#bbb"/></marker></defs>
+</svg>

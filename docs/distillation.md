@@ -1,4 +1,11 @@
-# Wiring a real student
+# Wiring a generative student
+
+> This page is about the **generative path** (Rung D of the training ladder): a LoRA
+> student for a capability that must produce text or code against an output schema. For
+> a capability whose answer is a choice, a score or a yes/no, use the decision path in
+> [architecture.md](architecture.md): a System-1 decision model behind the
+> `DecisionModel` port, calibrated and routed with abstain. That path needs no GPU and
+> no training run to get started.
 
 The baseline exists so the flywheel is closed and measurable. This is what replacing it
 involves, and the order to do it in.
