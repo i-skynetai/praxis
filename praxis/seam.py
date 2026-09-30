@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 import json, time, hashlib
+from .core.validate import DictOfTypesValidator
 
 
 @dataclass(frozen=True)
@@ -25,19 +26,12 @@ class Capability:
     examples: list[dict] = field(default_factory=list)
 
     def validate(self, output: Any) -> tuple[bool, str]:
-        """Is this output the shape the capability promised?"""
-        if not isinstance(output, dict):
-            return False, f"expected an object, got {type(output).__name__}"
-        types = {"str": str, "int": int, "float": (int, float), "bool": bool, "list": list}
-        for key, want in self.output_schema.items():
-            if key not in output:
-                return False, f"missing field {key!r}"
-            if want in types and not isinstance(output[key], types[want]):
-                return False, f"field {key!r} should be {want}, got {type(output[key]).__name__}"
-        extra = set(output) - set(self.output_schema)
-        if extra:
-            return False, f"unexpected fields: {sorted(extra)}"
-        return True, ""
+        """Is this output the shape the capability promised?
+
+        Delegates to the shared dict-of-types validator (``praxis.core.validate``), which
+        sits behind the ``SchemaValidator`` port so other validators can replace it.
+        """
+        return DictOfTypesValidator().validate(self.output_schema, output)
 
 
 @dataclass

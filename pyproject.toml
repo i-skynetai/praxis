@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "praxis"
+version = "0.2.0.dev0"
+description = "A provider-neutral System-1 / System-2 decision and training framework."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+
+# One distribution with extras (plan §3.8, decision 2). The core stays standard-library
+# only; each extra is filled in when its adapter lands in Phase 2 and its provider README
+# has been re-read, not before.
+[project.optional-dependencies]
+dev = ["mypy>=1.10"]
+
+[project.scripts]
+praxis = "praxis.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["praxis*"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["praxis/core", "praxis/providers", "praxis/cli.py", "praxis/demo.py", "praxis/__main__.py"]
+warn_unreachable = true
