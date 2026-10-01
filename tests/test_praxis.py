@@ -1,10 +1,10 @@
 import os, sys, unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from praxis.seam import Capability, Trace, call_teacher
-from praxis.gate import Gate
-from praxis.student import NearestNeighbourStudent, LoraStudent
-from praxis.router import Router
-from praxis.evaluate import evaluate, split, table
+from praxis_core.legacy.seam import Capability, Trace, call_teacher
+from praxis_core.legacy.gate import Gate
+from praxis_core.legacy.student import NearestNeighbourStudent, LoraStudent
+from praxis_core.legacy.router import Router
+from praxis_core.legacy.evaluate import evaluate, split, table
 
 CAP = Capability("classify", "Classify the ticket.", {"label": "str"})
 DATA = [("login page broken", "bug"), ("add dark mode", "feature"),

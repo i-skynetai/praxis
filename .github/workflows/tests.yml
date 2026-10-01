@@ -24,10 +24,10 @@ jobs:
       - name: Run the suite
         run: python -m unittest discover -s tests -t . -v
       - name: Run the demo with nothing installed
-        run: python -m praxis demo --tickets 30
+        run: python -m praxis_core demo --tickets 30
 
   typecheck:
-    # mypy --strict on praxis/core, praxis/providers and the CLI. mypy is a development
+    # mypy --strict on praxis_core (legacy excluded). mypy is a development
     # dependency only; nothing at runtime needs it.
     runs-on: ubuntu-latest
     steps:

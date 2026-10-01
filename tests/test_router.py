@@ -6,7 +6,7 @@ import random
 import unittest
 from typing import Mapping
 
-from praxis.core.contracts import (
+from praxis_core.contracts import (
     Budget,
     Capability,
     DecisionResult,
@@ -16,8 +16,8 @@ from praxis.core.contracts import (
     State,
     TeacherAnswer,
 )
-from praxis.core.router import DecisionRouter, RoutingPolicy, TeacherError
-from praxis.providers.fake import MALFORMED_MODES, FakeCalibrator, FakeDecisionModel, FakeTeacher, FakeTraceSink
+from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
+from praxis_core.providers.fake import MALFORMED_MODES, FakeCalibrator, FakeDecisionModel, FakeTeacher, FakeTraceSink
 from tests.helpers import oracle, triage_capability
 
 CAP = triage_capability()

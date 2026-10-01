@@ -6,15 +6,15 @@ import math
 import random
 import unittest
 
-from praxis.core.calibrate import (
+from praxis_core.calibrate import (
     TemperatureCalibrator,
     expected_calibration_error,
     negative_log_likelihood,
     scale,
 )
-from praxis.core.confidence import argmax, confidence
-from praxis.core.contracts import Question, QuestionTrace, TraceEvent
-from praxis.core.ports import Calibrator
+from praxis_core.confidence import argmax, confidence
+from praxis_core.contracts import Question, QuestionTrace, TraceEvent
+from praxis_core.ports import Calibrator
 from tests.helpers import triage_capability
 
 CAP = triage_capability()

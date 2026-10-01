@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "praxis"
-version = "0.2.0.dev0"
-description = "A provider-neutral System-1 / System-2 decision and training framework."
+name = "praxis-core"
+version = "0.3.0.dev0"
+description = "A provider-neutral System-1 / System-2 decision and training framework: capture what your model does, fit a small student, serve it with the big model as the permanent fallback."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
@@ -23,20 +23,22 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-# One distribution with extras (plan §3.8, decision 2). The core stays standard-library
-# only; each extra is filled in when its adapter lands in Phase 2 and its provider README
-# has been re-read, not before.
+# Distribution `praxis-core`, import `praxis_core`, command `praxis` (decided 2026-09-30:
+# `praxis` on PyPI is another project that also imports as `praxis`). One distribution
+# with extras (plan §3.8); the core stays standard-library only; each adapter is an
+# extra filled in when it lands, after its provider README has been re-read.
 [project.optional-dependencies]
 dev = ["mypy>=1.10"]
 
 [project.scripts]
-praxis = "praxis.cli:main"
+praxis = "praxis_core.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["praxis*"]
+include = ["praxis_core*"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["praxis/core", "praxis/providers", "praxis/cli.py", "praxis/demo.py", "praxis/__main__.py"]
+files = ["praxis_core"]
+exclude = '^praxis_core/legacy/'
 warn_unreachable = true

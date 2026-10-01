@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 import json, time, hashlib
-from .core.validate import DictOfTypesValidator
+from praxis_core.validate import DictOfTypesValidator
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class Capability:
     def validate(self, output: Any) -> tuple[bool, str]:
         """Is this output the shape the capability promised?
 
-        Delegates to the shared dict-of-types validator (``praxis.core.validate``), which
+        Delegates to the shared dict-of-types validator (``praxis_core.validate``), which
         sits behind the ``SchemaValidator`` port so other validators can replace it.
         """
         return DictOfTypesValidator().validate(self.output_schema, output)

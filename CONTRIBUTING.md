@@ -14,8 +14,8 @@ roadmap.
 
 ```bash
 python -m unittest discover -s tests -t .     # the suite: standard library only, no install
-python -m praxis demo                          # the loop end to end, under a second
-python -m mypy                                 # --strict on praxis/core, praxis/providers, the CLI
+python -m praxis_core demo                          # the loop end to end, under a second
+python -m mypy                                 # --strict on praxis_core (legacy excluded)
 ```
 
 The first two need nothing installed. `mypy` is the one development dependency
@@ -30,16 +30,16 @@ the maintainers develop in). CI runs the suite and the demo on 3.11 to 3.14 and 
   guarantee brings its test.
 - **A recorded reason for anything the change makes impossible.** A rule without a
   reason gets relaxed by the next person who finds it inconvenient.
-- **Standard library only in `praxis/core`.** A test enforces it. Providers and trainers
-  are pip extras and import their dependency lazily.
-- **No provider name outside `praxis/providers/`.** A test enforces that too. The core
+- **Standard library only outside `praxis_core/providers/`.** A test enforces it. Providers
+  and trainers are pip extras and import their dependency lazily.
+- **No provider name outside `praxis_core/providers/`.** A test enforces that too. The core
   promises a contract, not an adapter.
 - **`mypy --strict` clean** on the files it already covers.
-- **The demo still green.** `python -m praxis demo` is the README; it runs in CI.
+- **The demo still green.** `python -m praxis_core demo` is the README; it runs in CI.
 
 ## Adding an adapter
 
-Implement the port from `praxis/core/ports.py` — a `DecisionModel` has `info` and
+Implement the port from `praxis_core/ports.py` — a `DecisionModel` has `info` and
 `decide(state, questions) -> {name: RawAnswer}`; a `Teacher` has `info` and
 `answer(state, questions) -> {name: TeacherAnswer}` — and it routes. Nothing in the core
 needs to know what is behind it. Before writing one, re-read the provider's current

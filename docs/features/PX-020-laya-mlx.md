@@ -9,10 +9,10 @@ and will move.
 
 ## What is missing today
 
-`python -m praxis demo` closes the loop on the nearest-neighbour baseline only. No
+`python -m praxis_core demo` closes the loop on the nearest-neighbour baseline only. No
 adapter exists for a real decision model, so Praxis has never routed a call through
 the class of model the redesign is about, and the demo's shadow-warm agreement (0.73 on
-the rule teacher, **Verified** `python -m praxis demo`) has no real number to beat.
+the rule teacher, **Verified** `python -m praxis_core demo`) has no real number to beat.
 
 ## What the provider is (Verified, 2026-09-30)
 
@@ -101,7 +101,7 @@ router never issues two at once per instance, so a lock is the conservative defa
 
 Each line is a test that fails today and passes after:
 
-- `pip install -e ".[laya-mlx]"` installs the extra; `import praxis.providers` pulls no
+- `pip install -e ".[laya-mlx]"` installs the extra; `import praxis_core.providers` pulls no
   `mlx`; importing the adapter without the extra raises an `ImportError` naming it.
 - The adapter satisfies `DecisionModel`, maps every Praxis question type to the
   provider's (`boolean` → `noul`, `rank` never arrives), returns a distribution keyed by
@@ -109,7 +109,7 @@ Each line is a test that fails today and passes after:
   `confidence` in `native_confidence`.
 - The conformance suite (PX-027) passes on it: same requests as the fakes, same result
   shape, exceptions surface as router abstentions.
-- `python -m praxis demo --system1 laya-mlx` runs the four stages on the real model,
+- `python -m praxis_core demo --system1 laya-mlx` runs the four stages on the real model,
   prints the same table, and records `provider = "laya-mlx"` on every trace.
 - `praxis doctor` (PX-026) lists it as installed and loadable, and refuses a capability
   with more than 100 options in a choice question before any request.
@@ -118,7 +118,7 @@ Each line is a test that fails today and passes after:
 
 ## Design
 
-`praxis/providers/laya_mlx.py`, one class:
+`praxis_core/providers/laya_mlx.py`, one class:
 
 ```
 LayaMlxDecisionModel(checkpoint="aac6fef/laya-typed-decisions-mlx", dtype="float16",
@@ -168,7 +168,7 @@ per adapter instance.
 
 ## How it is measured
 
-`python -m praxis demo --system1 laya-mlx --tickets 60` against the rule teacher:
+`python -m praxis_core demo --system1 laya-mlx --tickets 60` against the rule teacher:
 shadow-warm agreement per question type, share served in the serve stage at the same
 threshold, confident-wrong count, and median System-1 latency from the traces, beside
 the same numbers for the nearest-neighbour baseline (0.73 agreement, 46 % served, 3

@@ -1,4 +1,4 @@
-"""``python -m praxis demo`` stays green: support.triage, fake teacher, baseline student,
+"""``python -m praxis_core demo`` stays green: support.triage, fake teacher, baseline student,
 under one second, no installs, no keys."""
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import tempfile
 import time
 import unittest
 
-from praxis.demo import TicketGenerator, rule_teacher, run_demo, support_triage
+from praxis_core.demo import TicketGenerator, rule_teacher, run_demo, support_triage
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -43,7 +43,7 @@ class TheDemoStaysGreen(unittest.TestCase):
 
     def test_the_module_entry_point_runs_with_nothing_installed(self):
         started = time.perf_counter()
-        proc = subprocess.run([sys.executable, "-m", "praxis", "demo", "--tickets", "30"], cwd=ROOT,
+        proc = subprocess.run([sys.executable, "-m", "praxis_core", "demo", "--tickets", "30"], cwd=ROOT,
                               capture_output=True, text=True, env={"PATH": "", "PYTHONDONTWRITEBYTECODE": "1"})
         wall = time.perf_counter() - started
         self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -55,16 +55,16 @@ class TheDemoStaysGreen(unittest.TestCase):
     def test_json_output_and_a_jsonl_sink(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / "traces.jsonl"
-            proc = subprocess.run([sys.executable, "-m", "praxis", "demo", "--tickets", "10", "--json",
+            proc = subprocess.run([sys.executable, "-m", "praxis_core", "demo", "--tickets", "10", "--json",
                                    "--jsonl", str(path)], cwd=ROOT, capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             summary = json.loads(proc.stdout)
             self.assertEqual(len(path.read_text().splitlines()), summary["trace_count"])
 
     def test_version_flag(self):
-        proc = subprocess.run([sys.executable, "-m", "praxis", "--version"], cwd=ROOT, capture_output=True, text=True)
+        proc = subprocess.run([sys.executable, "-m", "praxis_core", "--version"], cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("praxis 0.2", proc.stdout)
+        self.assertIn("praxis 0.3", proc.stdout)
 
 
 class TheTrafficAndTheTeacherAreHonest(unittest.TestCase):

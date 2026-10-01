@@ -24,7 +24,7 @@ teacher never leaves the loop.
 ## Try it, with nothing installed
 
 ```bash
-python -m praxis demo
+python -m praxis_core demo
 ```
 
 ```
@@ -62,7 +62,7 @@ a flag saying whether a fitted calibrator produced it, and abstain as a recorded
 | `rank` | order the options | `options` | the keys, best first, derived from the choice distribution |
 
 ```python
-from praxis import Capability, Question, DecisionRouter, RoutingPolicy
+from praxis_core import Capability, Question, DecisionRouter, RoutingPolicy
 
 triage = Capability("support.triage", questions={
     "department": Question.choice("Which team should handle this ticket?",
@@ -80,10 +80,10 @@ Every `DecisionResult` carries `answer`, `distribution`, `confidence` (Praxis's 
 ## Use it
 
 ```python
-from praxis.core.baseline import NearestNeighbourDecisionModel
-from praxis.core.calibrate import TemperatureCalibrator
-from praxis.core.dataset import examples_from_traces
-from praxis.core.trace import JsonlTraceSink
+from praxis_core.baseline import NearestNeighbourDecisionModel
+from praxis_core.calibrate import TemperatureCalibrator
+from praxis_core.dataset import examples_from_traces
+from praxis_core.trace import JsonlTraceSink
 
 student, calibrator, sink = NearestNeighbourDecisionModel(), TemperatureCalibrator(), JsonlTraceSink("traces.jsonl")
 router = DecisionRouter(triage, teacher=my_teacher,            # any object with the Teacher port
@@ -112,7 +112,7 @@ router.set_stage("serve")
 | One confidence scale for every provider: `1 - H(p)/log(n)` on the calibrated distribution. | `tests/test_calibrator.py`, `tests/test_contracts.py` |
 | The teacher is permanent. A confident System-1 needs no teacher; a failing teacher is recorded, then raised. | `tests/test_router.py::TheTeacherIsTheOnlyThingThatCanFail` |
 | An unfitted student is never served. | `tests/test_baseline.py` |
-| The core is standard library only, and no provider name appears outside `praxis/providers/`. | `tests/test_contracts.py::TheCoreIsStandardLibraryOnly` |
+| The core is standard library only, and no provider name appears outside `praxis_core/providers/`. | `tests/test_contracts.py::TheCoreIsStandardLibraryOnly` |
 | The whole loop closes in under a second with nothing installed. | `tests/test_demo.py` |
 
 ## The parts
@@ -120,7 +120,7 @@ router.set_stage("serve")
 | | |
 |---|---|
 | **contracts** | `Question`, `Capability` (kind = `decision` \| `generative`), `DecisionRequest`, `DecisionResult`, `DecisionExample`, and the trace envelope v2: a stable Praxis envelope, an opaque host partition key, an opaque payload. |
-| **ports** | Seven `Protocol`s: `DecisionModel`, `Teacher`, `Calibrator`, `Trainer`, `TraceSink`, `SchemaValidator`, `Registry`, plus the sibling `GenerativeModel`. One fake per port ships in `praxis.providers.fake`. |
+| **ports** | Seven `Protocol`s: `DecisionModel`, `Teacher`, `Calibrator`, `Trainer`, `TraceSink`, `SchemaValidator`, `Registry`, plus the sibling `GenerativeModel`. One fake per port ships in `praxis_core.providers.fake`. |
 | **router** | Eight steps per call: policy, timed and bounded System-1 call, calibrate, validate, serve or abstain per question, teacher for the rest (everything, in shadow), record. |
 | **calibrator** | One temperature per (question type, option count), fitted on traces that carry both answers. No gradients, no dependency. |
 | **sinks** | JSONL and SQLite. Both round-trip the envelope and read back by capability. |

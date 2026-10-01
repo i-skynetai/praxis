@@ -52,7 +52,7 @@ is a test:**
 | No test needs a frontier model | the suite runs green with fakes; local-model tests are opt-in | owner's rule, 2026-09-30 |
 
 Plus the standing checks: tests green on Python 3.11 to 3.14, `mypy --strict` clean,
-standard library only in `praxis/core`, no provider name outside `praxis/providers/`,
+standard library only in `praxis/core`, no provider name outside `praxis_core/providers/`,
 the demo under one second with the fakes.
 
 ## 3. In and out

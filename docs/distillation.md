@@ -13,7 +13,7 @@ involves, and the order to do it in.
 ## 1 · Get a baseline number first
 
 ```python
-from praxis.evaluate import split, evaluate, table
+from praxis_core.legacy.evaluate import split, evaluate, table
 train, held = split(traces, holdout=0.25)
 student = NearestNeighbourStudent(); student.fit(train)
 print(table({"nearest-neighbour": evaluate(student, held)}))

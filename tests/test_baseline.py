@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import unittest
 
-from praxis.core.baseline import NearestNeighbourDecisionModel, jaccard, tokens
-from praxis.core.confidence import argmax, confidence
-from praxis.core.contracts import Capability, Question
-from praxis.core.dataset import examples_from_traces
-from praxis.core.ports import DecisionModel
-from praxis.core.router import DecisionRouter, RoutingPolicy
-from praxis.providers.fake import FakeTeacher, FakeTraceSink
+from praxis_core.baseline import NearestNeighbourDecisionModel, jaccard, tokens
+from praxis_core.confidence import argmax, confidence
+from praxis_core.contracts import Capability, Question
+from praxis_core.dataset import examples_from_traces
+from praxis_core.ports import DecisionModel
+from praxis_core.router import DecisionRouter, RoutingPolicy
+from praxis_core.providers.fake import FakeTeacher, FakeTraceSink
 from tests.helpers import TicketGenerator, oracle, triage_capability
 
 CAP = triage_capability()

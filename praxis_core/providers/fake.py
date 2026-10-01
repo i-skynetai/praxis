@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
-from praxis.core.contracts import (
+from praxis_core.contracts import (
     Answer,
     DecisionExample,
     Distribution,

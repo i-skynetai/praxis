@@ -57,14 +57,14 @@ than 8b); how vLLM and LiteLLM proxies report `usage`.
   including a refusal, a malformed body and a 500. Live test against the local Ollama
   runs only when `PRAXIS_LIVE=1` and the server answers `GET /api/tags`.
 - The conformance suite (PX-027) runs the same triage requests through it.
-- `python -m praxis demo --teacher openai-compatible --base-url http://localhost:11434/v1
+- `python -m praxis_core demo --teacher openai-compatible --base-url http://localhost:11434/v1
   --model granite4.1:8b --tickets 10` runs the four stages with a real teacher. (At about
   seven seconds a call this is minutes, not one second; the one-second promise is for
   the fake teacher and stays tested.)
 
 ## Design
 
-`praxis/providers/openai_compat.py`, one class:
+`praxis_core/providers/openai_compat.py`, one class:
 
 ```
 OpenAICompatibleTeacher(base_url, model, api_key=None, *, timeout_s=60.0, temperature=0.0,

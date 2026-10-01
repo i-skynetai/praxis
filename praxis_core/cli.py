@@ -7,19 +7,19 @@ import json
 import sys
 from typing import Sequence
 
-from praxis import __version__
+from praxis_core import __version__
 
 
 def _demo(args: argparse.Namespace) -> int:
-    from praxis.core.ports import TraceSink
-    from praxis.demo import run_demo
+    from praxis_core.ports import TraceSink
+    from praxis_core.demo import run_demo
 
     sink: TraceSink | None = None
     if args.jsonl:
-        from praxis.core.trace import JsonlTraceSink
+        from praxis_core.trace import JsonlTraceSink
         sink = JsonlTraceSink(args.jsonl)
     elif args.sqlite:
-        from praxis.core.trace import SqliteTraceSink
+        from praxis_core.trace import SqliteTraceSink
         sink = SqliteTraceSink(args.sqlite)
     summary = run_demo(tickets=args.tickets, threshold=args.threshold, seed=args.seed, sink=sink,
                        out=None if args.json else print)

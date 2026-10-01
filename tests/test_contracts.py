@@ -1,5 +1,5 @@
-"""Phase 0: the contracts round-trip, the fakes satisfy the ports, the core is standard
-library only, and a fake end-to-end decide() returns a DecisionResult."""
+"""Phase 0: the contracts round-trip, the fakes satisfy the ports, the package outside
+``providers`` is standard library only, and a fake end-to-end decide() returns a DecisionResult."""
 from __future__ import annotations
 
 import ast
@@ -11,7 +11,7 @@ import subprocess
 import sys
 import unittest
 
-from praxis.core.contracts import (
+from praxis_core.contracts import (
     ENVELOPE_VERSION,
     Budget,
     Capability,
@@ -26,7 +26,7 @@ from praxis.core.contracts import (
     TraceEvent,
     normalise_question_type,
 )
-from praxis.core.ports import (
+from praxis_core.ports import (
     Calibrator,
     DecisionModel,
     GenerativeModel,
@@ -36,8 +36,8 @@ from praxis.core.ports import (
     Trainer,
     TraceSink,
 )
-from praxis.core.router import DecisionRouter, RoutingPolicy
-from praxis.providers.fake import (
+from praxis_core.router import DecisionRouter, RoutingPolicy
+from praxis_core.providers.fake import (
     FakeCalibrator,
     FakeDecisionModel,
     FakeGenerativeModel,
@@ -249,15 +249,21 @@ class TheCoreIsStandardLibraryOnly(unittest.TestCase):
                 names.add(node.module.split(".")[0])
         return names
 
+    @staticmethod
+    def _core_files() -> list[pathlib.Path]:
+        """Every module of the package except the adapters: the top level, legacy, and later learning."""
+        files = [p for p in (ROOT / "praxis_core").rglob("*.py") if "providers" not in p.parts]
+        assert len(files) >= 10, "the package tree moved; this gate would be vacuous"
+        return files
+
     def test_core_imports_only_the_standard_library(self):
-        for path in (ROOT / "praxis" / "core").glob("*.py"):
+        for path in self._core_files():
             for name in self._imports(path):
-                self.assertTrue(name == "praxis" or name in sys.stdlib_module_names,
-                                f"{path.name} imports {name}, which is not standard library")
+                self.assertTrue(name == "praxis_core" or name in sys.stdlib_module_names,
+                                f"{path.relative_to(ROOT)} imports {name}, which is not standard library")
 
     def test_no_provider_name_appears_outside_providers(self):
-        files = list((ROOT / "praxis" / "core").glob("*.py")) + [p for p in (ROOT / "praxis").glob("*.py")]
-        for path in files:
+        for path in self._core_files():
             text = path.read_text().lower()
             for word in self.VENDOR_WORDS:
                 self.assertIsNone(re.search(rf"\b{word}\b", text), f"{path.relative_to(ROOT)} mentions {word!r}")
@@ -291,7 +297,7 @@ class AFakeEndToEndDecideReturnsAResult(unittest.TestCase):
 @unittest.skipUnless(importlib.util.find_spec("mypy"), "mypy is not installed in this interpreter")
 class MypyStrictIsCleanOnTheCore(unittest.TestCase):
     def test_mypy_strict(self):
-        proc = subprocess.run([sys.executable, "-m", "mypy", "--strict", "praxis/core", "praxis/providers"],
+        proc = subprocess.run([sys.executable, "-m", "mypy"],   # scope and strictness come from pyproject.toml
                               cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 

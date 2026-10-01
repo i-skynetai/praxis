@@ -6,10 +6,10 @@ import pathlib
 import tempfile
 import unittest
 
-from praxis.core.contracts import Question, QuestionTrace, TraceEvent
-from praxis.core.ports import TraceSink
-from praxis.core.trace import JsonlTraceSink, SqliteTraceSink
-from praxis.demo import run_demo
+from praxis_core.contracts import Question, QuestionTrace, TraceEvent
+from praxis_core.ports import TraceSink
+from praxis_core.trace import JsonlTraceSink, SqliteTraceSink
+from praxis_core.demo import run_demo
 from tests.helpers import triage_capability
 
 CAP = triage_capability()

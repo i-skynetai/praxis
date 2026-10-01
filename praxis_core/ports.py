@@ -2,7 +2,7 @@
 ``GenerativeModel`` port for capabilities that must generate text.
 
 Each port is a ``typing.Protocol``: an adapter satisfies it by having the right methods,
-with no base class to inherit and nothing to register. ``praxis.providers.fake`` has one
+with no base class to inherit and nothing to register. ``praxis_core.providers.fake`` has one
 fake per port, and every real adapter is checked against the same conformance tests.
 
 What each port is for, in one line:

@@ -21,7 +21,7 @@ Each line is a test that fails today and passes after:
 The smallest change that meets the list above. Name the files it touches. If it needs a
 new port, a new field on the contract or a new envelope version, say why the existing
 ones do not fit — that is a decision to make on the issue before the code. Provider
-names stay under `praxis/providers/`; the core stays standard library only.
+names stay under `praxis_core/providers/`; the core stays standard library only.
 
 ## What it does not do
 

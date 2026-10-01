@@ -19,7 +19,7 @@ source of labels.
 
 ## 1 · The contract
 
-`praxis/core/contracts.py`. A `Capability` is a name (`<domain>.<operation>`), a kind
+`praxis_core/contracts.py`. A `Capability` is a name (`<domain>.<operation>`), a kind
 (`decision` or `generative`) and, for a decision, its `Question`s:
 
 | Type | Declares | Answer | Distribution keys |
@@ -48,7 +48,7 @@ choice. Whatever the provider says about itself is kept beside it and never rout
 
 ![One decision call through the router](images/router.svg)
 
-`praxis/core/router.py`, one router per capability. Per call, in order:
+`praxis_core/router.py`, one router per capability. Per call, in order:
 
 1. Resolve the policy: threshold, stage (`shadow` | `canary` | `serve`), canary share,
    System-1 timeout (capped by the request's budget).
@@ -79,7 +79,7 @@ there is nothing behind it, and hiding its failure would mean inventing an answe
 
 ## 3 · The calibrator
 
-`praxis/core/calibrate.py`. Every provider reports probabilities on its own terms. Praxis
+`praxis_core/calibrate.py`. Every provider reports probabilities on its own terms. Praxis
 fits one temperature per (question type, option count) on traces that carry both the raw
 System-1 distribution and the System-2 label, minimising the negative log-likelihood of
 the labels by golden-section search: no gradients, no dependency, milliseconds. `T > 1`
@@ -100,13 +100,13 @@ The **host partition** is the host's own isolation key, opaque. The **payload** 
 state and the late-bound `outcome` and `feedback`, which Praxis stores and never
 interprets. Plain dataclasses, `to_dict` / `from_dict`, no serialisation library.
 
-Sinks (`praxis/core/trace.py`): JSONL appends one object per line and the reader keeps
+Sinks (`praxis_core/trace.py`): JSONL appends one object per line and the reader keeps
 the latest per trace id; SQLite keeps envelope columns plus the JSON body and replaces
 by trace id. Both read back by capability. A sink may raise; the router counts it.
 
 ## 5 · From traces to a dataset
 
-`praxis/core/dataset.py`. A System-2 answer on a trace marked as a label candidate
+`praxis_core/dataset.py`. A System-2 answer on a trace marked as a label candidate
 becomes a `DecisionExample`: capability, question, type, state, the options or levels
 as presented, the label, its source, the teacher's distribution when there was one, and
 lineage. A trace whose question definition hash no longer matches the capability's
@@ -116,11 +116,11 @@ are Phase 4.
 
 ## 6 · The student
 
-`praxis/core/ports.py` fixes the port: `decide(state, questions) -> {name: RawAnswer}`,
+`praxis_core/ports.py` fixes the port: `decide(state, questions) -> {name: RawAnswer}`,
 a distribution per question plus whatever confidence the provider reports. Anything with
 that shape routes, and the fault-injection tests are the contract it is held to.
 
-The baseline (`praxis/core/baseline.py`) is the original nearest-neighbour student
+The baseline (`praxis_core/baseline.py`) is the original nearest-neighbour student
 expressed as a distribution: the `k` most similar remembered examples vote with their
 Jaccard similarity cubed, and the vote is mixed with a uniform prior in proportion to how
 weak the best match was, so a query that resembles nothing is uniform (confidence 0,
@@ -135,11 +135,11 @@ does; Rungs B and C arrive with the trainers; Rung D is the generative path belo
 ## 7 · The generative path
 
 The original modules stay for capabilities that must generate text or code:
-`praxis/seam.py` (a capability with an output schema and the dict-of-types validator,
-now behind the `SchemaValidator` port), `praxis/gate.py` (four checks: right capability,
+`praxis_core/legacy/seam.py` (a capability with an output schema and the dict-of-types validator,
+now behind the `SchemaValidator` port), `praxis_core/legacy/gate.py` (four checks: right capability,
 valid schema, within the latency bound, not a duplicate; rejections counted by reason),
-`praxis/student.py` (`LoraStudent`, whose `fit` raises until a backend is wired in),
-`praxis/router.py` and `praxis/evaluate.py` (confident-wrong reported separately from
+`praxis_core/legacy/student.py` (`LoraStudent`, whose `fit` raises until a backend is wired in),
+`praxis_core/legacy/router.py` and `praxis_core/legacy/evaluate.py` (confident-wrong reported separately from
 deflection). The `GenerativeModel` port is declared; routing generative capabilities
 through the same policy is a later milestone (see [ROADMAP.md](../ROADMAP.md)).
 

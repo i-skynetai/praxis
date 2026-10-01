@@ -24,13 +24,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from praxis.core.baseline import NearestNeighbourDecisionModel
-from praxis.core.calibrate import TemperatureCalibrator
-from praxis.core.contracts import Answer, Capability, Question, State
-from praxis.core.dataset import examples_from_traces
-from praxis.core.ports import TraceSink
-from praxis.core.router import DecisionRouter, RoutingPolicy
-from praxis.providers.fake import FakeTeacher, FakeTraceSink
+from praxis_core.baseline import NearestNeighbourDecisionModel
+from praxis_core.calibrate import TemperatureCalibrator
+from praxis_core.contracts import Answer, Capability, Question, State
+from praxis_core.dataset import examples_from_traces
+from praxis_core.ports import TraceSink
+from praxis_core.router import DecisionRouter, RoutingPolicy
+from praxis_core.providers.fake import FakeTeacher, FakeTraceSink
 
 DEPARTMENTS = {
     "billing": "Invoices, charges, refunds and payment methods.",
