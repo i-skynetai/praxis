@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="960" height="600" fill="#ffffff"/>
+  <text x="480" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#222">Your app keeps its main model. Praxis grows a small one beside it and routes by confidence.</text>
+
+  <!-- row 1: today -->
+  <rect x="40" y="56" width="220" height="58" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="150" y="80" text-anchor="middle" font-weight="bold" fill="#222">Your app</text>
+  <text x="150" y="100" text-anchor="middle" fill="#333" font-size="13">calls a big model for narrow jobs</text>
+  <line x1="260" y1="85" x2="368" y2="85" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="314" y="78" text-anchor="middle" fill="#666" font-size="12">calls, as today</text>
+
+  <rect x="370" y="56" width="220" height="58" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+  <text x="480" y="80" text-anchor="middle" font-weight="bold" fill="#222">Your main model</text>
+  <text x="480" y="100" text-anchor="middle" fill="#333" font-size="13">the teacher; it never leaves</text>
+  <line x1="590" y1="85" x2="698" y2="85" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="644" y="78" text-anchor="middle" fill="#666" font-size="12">the answer, reported</text>
+
+  <rect x="700" y="56" width="220" height="58" rx="6" fill="#fff8e1" stroke="#c9a227" stroke-width="1.5"/>
+  <text x="810" y="80" text-anchor="middle" font-weight="bold" fill="#222">Praxis: observe()</text>
+  <text x="810" y="100" text-anchor="middle" fill="#333" font-size="13">one line; never fails your call</text>
+  <line x1="810" y1="114" x2="810" y2="150" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- row 2: the loop -->
+  <rect x="40" y="152" width="880" height="120" rx="8" fill="none" stroke="#2f6fd6" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="60" y="172" fill="#2f6fd6" font-size="12" font-weight="bold">THE LOOP — on your laptop, no GPU, no key</text>
+  <g font-size="13">
+    <rect x="60" y="188" width="150" height="62" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+    <text x="135" y="210" text-anchor="middle" font-weight="bold" fill="#222">capture</text>
+    <text x="135" y="228" text-anchor="middle" fill="#555">every call, as a trace</text>
+    <text x="135" y="243" text-anchor="middle" fill="#555">input, answer, who, when</text>
+    <line x1="210" y1="219" x2="228" y2="219" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="230" y="188" width="150" height="62" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+    <text x="305" y="210" text-anchor="middle" font-weight="bold" fill="#222">dataset</text>
+    <text x="305" y="228" text-anchor="middle" fill="#555">answers become labels</text>
+    <text x="305" y="243" text-anchor="middle" fill="#555">every skip reported</text>
+    <line x1="380" y1="219" x2="398" y2="219" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="400" y="188" width="150" height="62" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+    <text x="475" y="210" text-anchor="middle" font-weight="bold" fill="#222">student</text>
+    <text x="475" y="228" text-anchor="middle" fill="#555">fit any small model</text>
+    <text x="475" y="243" text-anchor="middle" fill="#555">calibrate its confidence</text>
+    <line x1="550" y1="219" x2="568" y2="219" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="570" y="188" width="150" height="62" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+    <text x="645" y="210" text-anchor="middle" font-weight="bold" fill="#222">shadow</text>
+    <text x="645" y="228" text-anchor="middle" fill="#555">compare with the teacher</text>
+    <text x="645" y="243" text-anchor="middle" fill="#555">on identical inputs</text>
+    <line x1="720" y1="219" x2="738" y2="219" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="740" y="188" width="160" height="62" rx="6" fill="#fff8e1" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="820" y="210" text-anchor="middle" font-weight="bold" fill="#222">verdict</text>
+    <text x="820" y="228" text-anchor="middle" fill="#555">"ready for canary", or</text>
+    <text x="820" y="243" text-anchor="middle" fill="#555">what is still missing</text>
+  </g>
+  <line x1="480" y1="272" x2="480" y2="298" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- row 3: routing -->
+  <rect x="40" y="300" width="880" height="58" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+  <text x="480" y="323" text-anchor="middle" font-weight="bold" fill="#222">Route by confidence: shadow → canary → serve</text>
+  <text x="480" y="343" text-anchor="middle" fill="#333" font-size="13">student when it is sure · main model when it is not · "not sure" is a recorded outcome, not an error · nothing is served uncalibrated</text>
+  <line x1="290" y1="358" x2="290" y2="386" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="670" y1="358" x2="670" y2="386" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <rect x="160" y="388" width="260" height="58" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+  <text x="290" y="411" text-anchor="middle" font-weight="bold" fill="#222">The student answers</text>
+  <text x="290" y="431" text-anchor="middle" fill="#333" font-size="13">milliseconds, local, cheap, private</text>
+
+  <rect x="540" y="388" width="260" height="58" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+  <text x="670" y="411" text-anchor="middle" font-weight="bold" fill="#222">The main model answers the rest</text>
+  <text x="670" y="431" text-anchor="middle" fill="#333" font-size="13">the permanent fallback, and new labels</text>
+
+  <!-- row 4: kinds and ports -->
+  <g font-size="13">
+    <rect x="40" y="470" width="430" height="58" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+    <text x="255" y="492" text-anchor="middle" font-weight="bold" fill="#222">Two kinds of capability</text>
+    <text x="255" y="512" text-anchor="middle" fill="#555">decision (choice, score, yes/no)  ·  generative (an output against a schema)</text>
+
+    <rect x="490" y="470" width="430" height="58" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+    <text x="705" y="492" text-anchor="middle" font-weight="bold" fill="#222">Any student behind one port</text>
+    <text x="705" y="512" text-anchor="middle" fill="#555">a decision model · a small local LLM · built-in baselines · your own</text>
+  </g>
+
+  <text x="480" y="568" text-anchor="middle" fill="#666" font-size="13">standard library only · runs from a clone with nothing installed · every call leaves a trace you can replay</text>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker></defs>
+</svg>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="960" height="540" fill="#ffffff"/>
+  <text x="480" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#222">One call: the student proposes, the policy decides, the main model catches the rest, the trace remembers</text>
+
+  <!-- lane 1: observe -->
+  <text x="40" y="78" fill="#c9a227" font-size="12" font-weight="bold">OBSERVE: capture, serve nothing</text>
+  <g font-size="13">
+    <rect x="40" y="88" width="150" height="54" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+    <text x="115" y="110" text-anchor="middle" font-weight="bold" fill="#222">your app</text>
+    <text x="115" y="128" text-anchor="middle" fill="#555">as today</text>
+    <line x1="190" y1="115" x2="218" y2="115" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="220" y="88" width="170" height="54" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+    <text x="305" y="110" text-anchor="middle" font-weight="bold" fill="#222">its own main model</text>
+    <text x="305" y="128" text-anchor="middle" fill="#555">answers the call</text>
+    <line x1="390" y1="115" x2="418" y2="115" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="420" y="88" width="340" height="54" rx="6" fill="#fff8e1" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="590" y="110" text-anchor="middle" font-weight="bold" fill="#222">praxis.observe(request, answer)</text>
+    <text x="590" y="128" text-anchor="middle" fill="#555">validate · run the student in shadow · record · never raise</text>
+    <line x1="760" y1="115" x2="788" y2="115" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="790" y="88" width="130" height="54" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+    <text x="855" y="110" text-anchor="middle" font-weight="bold" fill="#222">trace</text>
+    <text x="855" y="128" text-anchor="middle" fill="#555">both answers kept</text>
+  </g>
+
+  <!-- lane 2: decide -->
+  <text x="40" y="208" fill="#2f6fd6" font-size="12" font-weight="bold">DECIDE: let Praxis serve</text>
+  <g font-size="13">
+    <rect x="40" y="218" width="130" height="54" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+    <text x="105" y="240" text-anchor="middle" font-weight="bold" fill="#222">your app</text>
+    <text x="105" y="258" text-anchor="middle" fill="#555">decide(request)</text>
+    <line x1="170" y1="245" x2="198" y2="245" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="200" y="218" width="150" height="54" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+    <text x="275" y="240" text-anchor="middle" font-weight="bold" fill="#222">student</text>
+    <text x="275" y="258" text-anchor="middle" fill="#555">proposes + confidence</text>
+    <line x1="350" y1="245" x2="378" y2="245" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <rect x="380" y="218" width="170" height="54" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+    <text x="465" y="240" text-anchor="middle" font-weight="bold" fill="#222">calibrate · validate</text>
+    <text x="465" y="258" text-anchor="middle" fill="#555">one confidence scale for all</text>
+    <line x1="550" y1="245" x2="586" y2="245" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <polygon points="650,208 712,245 650,282 588,245" fill="#fff8e1" stroke="#c9a227" stroke-width="1.5"/>
+    <text x="650" y="241" text-anchor="middle" font-weight="bold" fill="#222">sure</text>
+    <text x="650" y="257" text-anchor="middle" fill="#222">and valid?</text>
+
+    <line x1="712" y1="245" x2="788" y2="245" stroke="#2e8b57" stroke-width="1.5" marker-end="url(#g)"/>
+    <text x="750" y="238" text-anchor="middle" fill="#2e8b57" font-size="12">yes</text>
+    <rect x="790" y="218" width="130" height="54" rx="6" fill="#d9f2e0" stroke="#2e8b57" stroke-width="1.5"/>
+    <text x="855" y="240" text-anchor="middle" font-weight="bold" fill="#222">serve</text>
+    <text x="855" y="258" text-anchor="middle" fill="#555">by the student</text>
+
+    <line x1="650" y1="282" x2="650" y2="318" stroke="#c0392b" stroke-width="1.5" marker-end="url(#r)"/>
+    <text x="700" y="304" text-anchor="middle" fill="#c0392b" font-size="12">no → abstain, with the reason</text>
+    <rect x="560" y="320" width="180" height="54" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+    <text x="650" y="342" text-anchor="middle" font-weight="bold" fill="#222">main model</text>
+    <text x="650" y="360" text-anchor="middle" fill="#555">the teacher answers instead</text>
+    <line x1="740" y1="347" x2="788" y2="347" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/>
+    <rect x="790" y="320" width="130" height="54" rx="6" fill="#dbe8fb" stroke="#2f6fd6" stroke-width="1.5"/>
+    <text x="855" y="342" text-anchor="middle" font-weight="bold" fill="#222">serve</text>
+    <text x="855" y="360" text-anchor="middle" fill="#555">and keep the label</text>
+  </g>
+
+  <!-- underneath -->
+  <rect x="40" y="410" width="880" height="62" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
+  <text x="480" y="433" text-anchor="middle" font-weight="bold" fill="#222">Underneath every call</text>
+  <text x="480" y="452" text-anchor="middle" fill="#333" font-size="13">a trace with both answers, the confidence and the reason · a student error, timeout or malformed answer is an abstention, never an exception</text>
+  <text x="480" y="467" text-anchor="middle" fill="#333" font-size="13">a dead trace store is counted, not raised · with require_calibrated, nothing is served until a calibrator was fitted in shadow</text>
+
+  <text x="480" y="512" text-anchor="middle" fill="#666" font-size="13">shadow: the main model always serves, the student is only compared · canary: a share of calls · serve: every sure, valid answer</text>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+    <marker id="g" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#2e8b57"/></marker>
+    <marker id="r" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c0392b"/></marker>
+  </defs>
+</svg>

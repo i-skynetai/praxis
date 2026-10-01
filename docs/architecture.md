@@ -59,7 +59,7 @@ choice. Whatever the provider says about itself is kept beside it and never rout
 
 ## 2 · The router
 
-![One decision call through the router](images/router.svg)
+![One decision call through the router](images/router.png)
 
 `praxis_core/router.py`, one router per capability: `DecisionRouter` for typed questions,
 `GenerativeRouter` for an output against a schema. Per call, in order:
@@ -158,7 +158,7 @@ Jaccard similarity cubed, and the vote is mixed with a uniform prior in proporti
 weak the best match was, so a query that resembles nothing is uniform (confidence 0,
 never served) and a near-duplicate is peaked. Unfitted, it is uniform for everything.
 
-![The training ladder](images/training-ladder.svg)
+![The training ladder](images/training-ladder.png)
 
 Climb per capability, stop at the first rung whose scorecard clears the gate. Rung A
 (a pretrained decision model plus a fitted temperature) is what the calibrator already
@@ -174,6 +174,40 @@ valid schema, within the latency bound, not a duplicate; rejections counted by r
 `praxis_core/legacy/router.py` and `praxis_core/legacy/evaluate.py` (confident-wrong reported separately from
 deflection). The `GenerativeModel` port is declared; routing generative capabilities
 through the same policy is a later milestone (see [ROADMAP.md](../ROADMAP.md)).
+
+
+## Guarantees, and the test that proves each
+
+Every rule below is enforced by a named test, not by convention. The reasoning behind the
+design is in [decisions.md](decisions.md), one dated entry per decision.
+
+| Guarantee | Proof |
+|---|---|
+| A System-1 error, timeout or malformed answer never fails the call. It is an abstention with a reason, and the teacher serves. | `tests/test_router.py::FaultInjectionNeverFailsTheCall` — including 100 hostile calls, 100 % served by System-2 |
+| The trace path never raises into the caller. A broken sink is counted, not raised. | `tests/test_router.py::TheTracePathNeverRaises` |
+| Abstain is a recorded outcome, not an error. | `tests/test_router.py::ServeAndAbstain` |
+| Shadow records both answers side by side. | `tests/test_router.py::ShadowRecordsBothAnswers` |
+| One confidence scale for every provider: `1 - H(p)/log(n)` on the calibrated distribution. | `tests/test_calibrator.py`, `tests/test_contracts.py` |
+| The teacher is permanent. A confident System-1 needs no teacher; a failing teacher is recorded, then raised. | `tests/test_router.py::TheTeacherIsTheOnlyThingThatCanFail` |
+| An unfitted student is never served. | `tests/test_baseline.py` |
+| The core is standard library only, and no provider name appears outside `praxis_core/providers/`. | `tests/test_contracts.py::TheCoreIsStandardLibraryOnly` |
+| Capture never fails the request and adds no visible latency: observe mode never raises; the background sink returns in microseconds and counts drops. | `tests/test_router.py::ObserveModeNeverTouchesTheRequestPath`, `tests/test_sinks.py::TheBackgroundSinkCostsTheCallerNothing` |
+| Nothing is served without a fitted calibrator when the policy says so. | `tests/test_generative.py`, `tests/test_router.py` (`require_calibrated`) |
+| A captured trace rebuilds the request it recorded. | `tests/test_router.py` (replay equivalence) |
+| The whole loop closes in under a second with nothing installed, for both kinds. | `tests/test_demo.py` |
+
+## The parts, by module
+
+| | |
+|---|---|
+| **contracts** | `Question`, `Capability` (kind = `decision` \| `generative`), `DecisionRequest`, `DecisionResult`, `DecisionExample`, and the trace envelope v2: a stable Praxis envelope, an opaque host partition key, an opaque payload. |
+| **ports** | Seven `Protocol`s: `DecisionModel`, `Teacher`, `Calibrator`, `Trainer`, `TraceSink`, `SchemaValidator`, `Registry`, plus the sibling `GenerativeModel`. One fake per port ships in `praxis_core.providers.fake`. |
+| **router** | `DecisionRouter` and `GenerativeRouter`: eight steps per call: policy, timed and bounded System-1 call, calibrate, validate, serve or abstain, teacher for the rest (everything, in shadow), record. Plus `observe()`: the app's own answer becomes the trace. |
+| **calibrator** | One temperature per (question type, option count) for distributions; a Platt map for a scalar confidence. Both fitted on traces that carry both answers. No gradients, no dependency. |
+| **sinks** | JSONL and SQLite, and a background queue in front of either. All round-trip the envelope and read back by capability. |
+| **baseline** | The nearest-neighbour student behind the `DecisionModel` port: a distribution from similarity-weighted votes, the best similarity kept as `native_confidence`. Exists so the loop is demonstrably closed and a real model has a number to beat. |
+| **seam, gate, student, evaluate** | The original modules, kept for the generative path: the four-check gate, the confident-wrong metric, and a `LoraStudent` whose `fit` raises until a backend is wired in. |
+
 
 ## Ports and adapters
 
@@ -205,3 +239,10 @@ Rung A alone clears the gate for a large share of routing-type capabilities.
 A web dashboard, a REST control plane, role-based access, cloud deployment, Postgres as
 the default store, and any provider-specific extension surfaced through the portable
 API. The CLI and JSON artifacts are the interface.
+
+## Diagram sources
+
+Every picture in this repository is hand-written SVG, kept beside the PNG that the pages
+embed: `docs/images/architecture.svg`, `one-call.svg` and `demo.svg` (the README),
+`router.svg` and `training-ladder.svg` (this page). Edit the SVG, re-render the PNG with
+headless Chrome at the SVG's own size, and look at it before committing.

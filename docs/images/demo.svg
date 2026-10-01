@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13">
+  <rect width="960" height="560" rx="10" fill="#1e1e1e"/>
+  <circle cx="22" cy="20" r="6" fill="#ff5f56"/><circle cx="42" cy="20" r="6" fill="#ffbd2e"/><circle cx="62" cy="20" r="6" fill="#27c93f"/>
+  <text x="480" y="25" text-anchor="middle" fill="#9a9a9a" font-size="12">python -m praxis_core demo — both capability kinds, fake teacher, baseline students, no install, no keys</text>
+  <g fill="#d4d4d4" xml:space="preserve" style="white-space: pre">
+    <text x="20" y="58"><tspan fill="#6a9955">$</tspan> python -m praxis_core demo</text>
+    <text x="20" y="84" fill="#dcdcaa">support.triage: 3 questions (department, urgency, churn_risk), threshold 0.5</text>
+    <text y="106" fill="#9a9a9a"><tspan x="20">stage</tspan><tspan x="200">calls</tspan><tspan x="270">questions</tspan><tspan x="370">system1</tspan><tspan x="460">abstain</tspan><tspan x="550">agree</tspan></text>
+    <text y="124"><tspan x="20">observe</tspan><tspan x="200">60</tspan><tspan x="270">180</tspan><tspan x="370">0%</tspan><tspan x="460">0%</tspan><tspan x="550">0.28</tspan><tspan x="620" fill="#9a9a9a">the app's own answers, recorded</tspan></text>
+    <text y="142"><tspan x="20">shadow-warm</tspan><tspan x="200">60</tspan><tspan x="270">180</tspan><tspan x="370">0%</tspan><tspan x="460">0%</tspan><tspan x="550">0.79</tspan><tspan x="620" fill="#9a9a9a">student fitted, compared, not served</tspan></text>
+    <text x="20" y="160">verdict: <tspan fill="#4ec9b0">ready for canary: agreement 0.79 on 180, calibrator fitted</tspan></text>
+    <text y="178"><tspan x="20">canary-50%</tspan><tspan x="200">60</tspan><tspan x="270">180</tspan><tspan x="370" fill="#4ec9b0">31%</tspan><tspan x="460">69%</tspan><tspan x="550">0.72</tspan></text>
+    <text y="196"><tspan x="20">serve</tspan><tspan x="200">60</tspan><tspan x="270">180</tspan><tspan x="370" fill="#4ec9b0">61%</tspan><tspan x="460">39%</tspan><tspan x="550">-</tspan></text>
+    <text x="20" y="220">calibrator: boolean/2 T=0.24  choice/4 T=0.57  score/4 T=0.19</text>
+    <text x="20" y="238">served by System-1 in the serve stage: 110; the teacher would have disagreed on <tspan fill="#dcdcaa">5</tspan> (confident-wrong)</text>
+
+    <text x="20" y="276" fill="#dcdcaa">support.extract: 3 fields (product, issue, order_id), threshold 0.5</text>
+    <text y="298" fill="#9a9a9a"><tspan x="20">stage</tspan><tspan x="200">calls</tspan><tspan x="270">questions</tspan><tspan x="370">system1</tspan><tspan x="460">abstain</tspan><tspan x="550">agree</tspan></text>
+    <text y="316"><tspan x="20">observe</tspan><tspan x="200">60</tspan><tspan x="270">60</tspan><tspan x="370">0%</tspan><tspan x="460">0%</tspan><tspan x="550">-</tspan></text>
+    <text y="334"><tspan x="20">shadow-warm</tspan><tspan x="200">60</tspan><tspan x="270">60</tspan><tspan x="370">0%</tspan><tspan x="460">0%</tspan><tspan x="550" fill="#f48771">0.00</tspan></text>
+    <text x="20" y="352">verdict: <tspan fill="#f48771">stays in shadow: shadow agreement 0.00 &lt; 0.5; calibrator not fitted</tspan></text>
+    <text y="370"><tspan x="20">canary-50%</tspan><tspan x="200">60</tspan><tspan x="270">60</tspan><tspan x="370">0%</tspan><tspan x="460" fill="#f48771">100%</tspan><tspan x="550">0.02</tspan></text>
+    <text y="388"><tspan x="20">serve</tspan><tspan x="200">60</tspan><tspan x="270">60</tspan><tspan x="370">0%</tspan><tspan x="460" fill="#f48771">100%</tspan><tspan x="550">0.03</tspan></text>
+    <text x="20" y="412">served by System-1 in the serve stage: 0; the teacher would have disagreed on 0 (confident-wrong)</text>
+    <text x="20" y="430" fill="#9a9a9a">the policy requires a fitted calibrator, so nothing was served: a student that copies its</text>
+    <text x="20" y="448" fill="#9a9a9a">nearest neighbour cannot extract, and Praxis says so instead of serving it</text>
+
+    <text x="20" y="484">480 traces recorded; the trace path raised into the caller <tspan fill="#4ec9b0">0</tspan> times</text>
+    <text x="20" y="502">loop closed in <tspan fill="#4ec9b0">123 ms</tspan>: capture -> label -> fit -> calibrate -> canary -> serve, for both kinds. The teacher stays.</text>
+    <text x="20" y="536"><tspan fill="#6a9955">$</tspan> python -m praxis_core demo --provider http://localhost:11434/v1 --model granite4.1:3b --roles teacher --tickets 5</text>
+    <text x="20" y="554" fill="#9a9a9a">   # same loop, a real local model as the teacher</text>
+  </g>
+</svg>

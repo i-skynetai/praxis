@@ -66,6 +66,14 @@ them into abstentions, and hiding them would hide the failure rate.
 - **A product, host or vendor in the core or the docs.** The only example capability is
   `support.triage`.
 
+## Documentation
+
+The README follows the shared standard for these repositories: a fixed section order, at
+most 900 words, a PNG picture within the first 25 lines with its SVG kept beside it,
+numbered steps, a terminal image of real output, no "just", "simply" or "easy", counts
+that match the code. Run `python3 ../check-docs.py .` from the repository root before
+any commit that touches `README.md` or `docs/`, and fix every FAIL.
+
 ## Style
 
 Match the file you are editing. The code explains its own reasoning in docstrings; keep
