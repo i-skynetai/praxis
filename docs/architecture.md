@@ -8,14 +8,27 @@ provider-neutral port, and the LLM becomes **System-2**, the permanent fallback 
 source of labels.
 
 ```
-  1 contract     what is being asked, in types: a state and named questions
-  2 router       who answers each question, and why
-  3 calibrator   one confidence scale for every provider
+  0 capture      the app's own model answers; Praxis records it (observe mode)
+  1 contract     what is being asked, in types: named questions, or an output schema
+  2 router       who answers, and why: decision and generative kinds, same steps
+  3 calibrator   one confidence scale for every provider: a temperature, or a Platt map
   4 trace        what happened, replayable, with both answers when there are two
   5 dataset      which System-2 answers become labels, and which are refused
-  6 student      a decision model behind one port: the baseline today, real ones next
-  7 evaluate     is the student worth promoting? (Phase 3)
+  6 student      any model behind one of two ports: baselines today, real ones next
+  7 evaluate     is the student worth promoting? (0.4.0 and 0.5.0)
 ```
+
+## 0 · Capture first: observe mode
+
+The original design's wedge. The app keeps calling its own model and hands Praxis the
+answer: `router.observe(request, answers, info, latency_ms, cost_usd)`. Praxis validates
+the answer against the declared set (or schema), runs the configured student in shadow,
+records the trace with the app's answer as System-2 and the student's beside it, and
+returns the trace. It never raises: a bad request or an invalid answer is a recorded
+failure that becomes no label; anything unexpected is counted on the router's stats.
+`TraceEvent.to_request()` rebuilds the request a trace recorded, which is the
+replay-equivalence property. In front of any sink, `QueuedTraceSink` makes `record`
+return in microseconds and counts, never raises, what it cannot keep.
 
 ## 1 · The contract
 
@@ -48,7 +61,8 @@ choice. Whatever the provider says about itself is kept beside it and never rout
 
 ![One decision call through the router](images/router.svg)
 
-`praxis_core/router.py`, one router per capability. Per call, in order:
+`praxis_core/router.py`, one router per capability: `DecisionRouter` for typed questions,
+`GenerativeRouter` for an output against a schema. Per call, in order:
 
 1. Resolve the policy: threshold, stage (`shadow` | `canary` | `serve`), canary share,
    System-1 timeout (capped by the request's budget).
@@ -77,9 +91,21 @@ choice. Whatever the provider says about itself is kept beside it and never rout
 The last row is the one place a call can fail. The teacher is the caller's own System-2,
 there is nothing behind it, and hiding its failure would mean inventing an answer.
 
+Two more rows apply to both kinds. `RoutingPolicy.require_calibrated` serves nothing
+whose confidence did not pass through a *fitted* calibrator (abstain: `uncalibrated`),
+which is the original design's rule that calibration is proven in shadow before any
+traffic moves. And in the generative router the validator is the hard gate: an output
+that fails the capability's schema is never served, whatever its confidence, and a
+host-supplied match function decides what counts as "the same output" for shadow
+agreement and calibration (the default is exact after normalisation).
+
 ## 3 · The calibrator
 
-`praxis_core/calibrate.py`. Every provider reports probabilities on its own terms. Praxis
+`praxis_core/calibrate.py`. Two calibrators behind two ports. For a student that reports
+one number (a generative student's self-reported confidence) `PlattCalibrator` fits
+``p = sigmoid(a · logit(c) + b)`` on (confidence, matched the label) pairs by damped
+Newton, and skips with a reason when it has too few pairs or no positives. For a
+distribution: every provider reports probabilities on its own terms. Praxis
 fits one temperature per (question type, option count) on traces that carry both the raw
 System-1 distribution and the System-2 label, minimising the negative log-likelihood of
 the labels by golden-section search: no gradients, no dependency, milliseconds. `T > 1`
@@ -116,9 +142,15 @@ are Phase 4.
 
 ## 6 · The student
 
-`praxis_core/ports.py` fixes the port: `decide(state, questions) -> {name: RawAnswer}`,
-a distribution per question plus whatever confidence the provider reports. Anything with
-that shape routes, and the fault-injection tests are the contract it is held to.
+`praxis_core/ports.py` fixes two ports. `DecisionModel.decide(state, questions)` returns a
+distribution per question plus whatever confidence the provider reports;
+`GenerativeModel.generate(state, instructions, output_schema)` returns an output and one
+confidence. Anything with either shape routes, and the fault-injection tests are the
+contract it is held to. One adapter ships beyond the fakes: the chat-completions adapter
+in `praxis_core/providers`, which plays generative student, decision System-1
+(self-reported probabilities) and teacher against any local model server or proxy that
+speaks that protocol. Adapters are reached through neutral factories, so no vendor name
+appears outside `praxis_core/providers/`; a test enforces it.
 
 The baseline (`praxis_core/baseline.py`) is the original nearest-neighbour student
 expressed as a distribution: the `k` most similar remembered examples vote with their

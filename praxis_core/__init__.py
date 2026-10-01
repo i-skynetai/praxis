@@ -35,7 +35,7 @@ from praxis_core.ports import (
 )
 from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
 
-__version__ = "0.3.0.dev0"
+__version__ = "0.3.0"
 
 __all__ = [
     "Calibrator", "Capability", "DecisionExample", "DecisionModel", "DecisionRequest", "DecisionResult",

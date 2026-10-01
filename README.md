@@ -4,49 +4,87 @@
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![licence](https://img.shields.io/badge/licence-Apache%202.0-blue)](LICENSE)
 
-**A provider-neutral System-1 / System-2 decision and training framework.**
+**Capture what your main model does. Fit a small student from it. Serve the student by
+confidence, with the main model as the permanent fallback.**
 
-A capability declares typed questions about a state. A fast decision model (System-1)
-answers each one with a probability distribution in milliseconds. Praxis calibrates that
-distribution, computes one confidence that means the same thing for every provider, and
-either **serves** the answer or **abstains** to your LLM (System-2). Every call leaves a
-trace. The teacher's answers become the labels that train the next System-1, and the
-teacher never leaves the loop.
+Your app already makes calls to a big model for narrow jobs: which team gets this
+ticket, how urgent is it, pull the order id out of it. Praxis watches those calls (one
+line, never fails the request), turns the answers into a dataset, fits a small student of
+any kind (a decision model, a small local LLM, a baseline), measures it against the main
+model on identical inputs, tells you whether it is ready, and serves it behind confidence
+routing: shadow → canary → serve, with the main model catching everything the student is
+not sure about. Every call leaves a trace. Nothing here needs a cloud or a key.
 
 ```
-  DecisionRequest ──► System-1 ──► calibrate ──► valid and confident?
-  state + questions   (any provider)               │ yes  serve, answered_by = system1
-                                                   │ no   abstain → System-2 (your LLM) → serve, and keep the answer as a label
-                                                   ▼
-                                       trace: both answers, both distributions, confidence, reason
+  your app ──► its own model ──► praxis.observe(request, answer)      ← the wedge: capture first
+                                        │
+                                        ▼  traces → dataset → fit a student → measure → verdict
+                                        │
+  your app ──► praxis.decide(request) ──► student ──► calibrate ──► valid and confident?
+                                                                     │ yes  serve (system1)
+                                                                     │ no   abstain → main model (system2), keep the label
 ```
+
+Two capability kinds, one loop: **decision** (typed questions: choice, score, yes-no)
+and **generative** (an output against a schema: extraction, structured generation).
 
 ## Try it, with nothing installed
 
 ```bash
-python -m praxis_core demo
+git clone <this repository> && cd praxis
+python -m praxis_core demo          # or: pip install -e . && praxis demo
 ```
 
 ```
-praxis demo: support.triage, 3 questions, fake teacher, nearest-neighbour student, threshold 0.5
+praxis demo: support.triage, 3 questions, fake-teacher teacher, nearest-neighbour student, threshold 0.5
 
 stage          calls  questions  system1  abstain   agree     ms
-shadow-cold       60        180      0%       0%    0.29    8.2
-shadow-warm       60        180      0%       0%    0.73   19.0
-canary-50%        60        180     27%      73%    0.74   20.5
-serve             60        180     46%      54%       -   19.6
+observe           60        180      0%       0%    0.28    7.1
+shadow-warm       60        180      0%       0%    0.79   20.8
+verdict: ready for canary: agreement 0.79 on 180, calibrator fitted
+canary-50%        60        180     31%      69%    0.72   21.8
+serve             60        180     61%      39%       -   19.1
 
-calibrator: boolean/2 T=0.40  choice/4 T=0.79  score/4 T=0.18
+calibrator: boolean/2 T=0.24  choice/4 T=0.57  score/4 T=0.19
 labels: 180 System-2 answers from 60 traces -> 180 examples -> student fitted
-served by System-1 in the serve stage: 83; the teacher would have disagreed on 3 (confident-wrong)
-240 traces recorded; the trace path raised into the caller 0 times
-loop closed in 93 ms: capture -> label -> fit -> calibrate -> canary -> serve. The teacher stays.
+served by System-1 in the serve stage: 110; the teacher would have disagreed on 5 (confident-wrong)
+
+support.extract: 3 fields, fake-extract-teacher teacher, nearest-neighbour-generative student, threshold 0.5
+
+stage          calls  questions  system1  abstain   agree     ms
+observe           60         60      0%       0%       -    2.8
+shadow-warm       60         60      0%       0%    0.00   10.0
+verdict: stays in shadow: shadow agreement 0.00 < 0.5; calibrator not fitted
+canary-50%        60         60      0%     100%    0.02    9.0
+serve             60         60      0%     100%    0.03    8.6
+
+calibrator: platt not fitted
+labels: 60 System-2 outputs -> 60 examples -> student fitted
+served by System-1 in the serve stage: 0; the teacher would have disagreed on 0 (confident-wrong)
+the policy requires a fitted calibrator, so nothing was served: a student that copies its nearest neighbour cannot extract, and Praxis says so instead of serving it
+
+480 traces recorded; the trace path raised into the caller 0 times
+loop closed in 123 ms: capture -> label -> fit -> calibrate -> canary -> serve, for both kinds. The teacher stays.
 ```
 
 `support.triage` asks three questions of a support ticket: `department` (a choice of
-four), `urgency` (a score on four levels) and `churn_risk` (a boolean). A synthetic
-ticket generator is the traffic, a keyword rule stands in for the System-2 teacher, and
-the nearest-neighbour baseline is the System-1 student. Standard library, no keys.
+four), `urgency` (a score on four levels) and `churn_risk` (a boolean). `support.extract`
+pulls `product`, `issue` and `order_id` out of the same tickets. A synthetic ticket
+generator is the traffic, keyword rules stand in for the main model, and the
+nearest-neighbour baselines are the students. The first stage is **observe mode**: the
+demo plays the app, calls "its own model" itself, and reports the answers to Praxis.
+
+Read the second table carefully: it is the point of the project. The copy-the-nearest-
+neighbour baseline cannot extract (0 % agreement in shadow), so the verdict keeps it in
+shadow and the policy serves nothing. Praxis said no instead of serving 63 wrong answers,
+which is what the first version of this demo did before `require_calibrated` existed.
+
+To run the same demo with a real local model as the teacher (any server speaking the
+chat-completions protocol, for example a local Ollama):
+
+```bash
+python -m praxis_core demo --provider http://localhost:11434/v1 --model granite4.1:3b --roles teacher --tickets 5
+```
 
 ## The contract
 
@@ -79,27 +117,47 @@ Every `DecisionResult` carries `answer`, `distribution`, `confidence` (Praxis's 
 
 ## Use it
 
+**Step 1, capture.** Your app keeps calling its own model. Add one line after the call:
+
+```python
+from praxis_core import DecisionRouter, ModelInfo, RoutingPolicy
+from praxis_core.trace import JsonlTraceSink, QueuedTraceSink
+
+sink = QueuedTraceSink(JsonlTraceSink("traces.jsonl"))            # capture costs microseconds
+router = DecisionRouter(triage, teacher=my_teacher, sink=sink, policy=RoutingPolicy(stage="shadow"))
+
+answers = my_big_model(ticket)                                    # your call, unchanged
+router.observe_state(ticket, answers, ModelInfo("my-provider", "big-model"), latency_ms=820)   # never raises
+```
+
+**Step 2, a student.** When traces exist, fit one and run it in shadow beside the app's
+answers; the verdict tells you when it is ready:
+
 ```python
 from praxis_core.baseline import NearestNeighbourDecisionModel
 from praxis_core.calibrate import TemperatureCalibrator
 from praxis_core.dataset import examples_from_traces
-from praxis_core.trace import JsonlTraceSink
 
-student, calibrator, sink = NearestNeighbourDecisionModel(), TemperatureCalibrator(), JsonlTraceSink("traces.jsonl")
-router = DecisionRouter(triage, teacher=my_teacher,            # any object with the Teacher port
-                        system1=student, calibrator=calibrator, sink=sink,
-                        policy=RoutingPolicy(threshold=0.6, stage="shadow"))
+examples, report = examples_from_traces(sink.read("support.triage"), triage)   # every skip is reported
+student = NearestNeighbourDecisionModel(); student.fit(examples)
+router = DecisionRouter(triage, teacher=my_teacher, system1=student, calibrator=TemperatureCalibrator(),
+                        sink=sink, policy=RoutingPolicy(threshold=0.6, stage="shadow", require_calibrated=True))
+# ... more observe or decide calls in shadow, then:
+router.calibrator.fit(list(sink.read("support.triage")))
+```
 
-results = router.decide_state({"subject": "invoice charged twice", "body": "..."})
-results["urgency"].answer, results["urgency"].confidence, results["urgency"].answered_by
+**Step 3, serve by confidence.** Let Praxis make the call: the student answers what it is
+sure about, the main model the rest, and every call is traced.
 
-# Trust the loop before the model: shadow, then labels, then a fitted student, then calibrate, then serve.
-examples, report = examples_from_traces(sink.read("support.triage"), triage)   # nothing is skipped silently
-student.fit(examples)
-calibrator.fit(list(sink.read("support.triage")))
+```python
 router.set_stage("canary", canary_share=0.2)
+results = router.decide_state({"subject": "invoice charged twice", "body": "..."})
+results["urgency"].answer, results["urgency"].confidence, results["urgency"].answered_by   # 2, 0.71, "system1"
 router.set_stage("serve")
 ```
+
+A generative capability works the same way through `GenerativeRouter` with an
+`output_schema` instead of questions; `praxis_core.demo` has both.
 
 ## What Praxis guarantees, and the test that proves each
 
@@ -113,7 +171,10 @@ router.set_stage("serve")
 | The teacher is permanent. A confident System-1 needs no teacher; a failing teacher is recorded, then raised. | `tests/test_router.py::TheTeacherIsTheOnlyThingThatCanFail` |
 | An unfitted student is never served. | `tests/test_baseline.py` |
 | The core is standard library only, and no provider name appears outside `praxis_core/providers/`. | `tests/test_contracts.py::TheCoreIsStandardLibraryOnly` |
-| The whole loop closes in under a second with nothing installed. | `tests/test_demo.py` |
+| Capture never fails the request and adds no visible latency: observe mode never raises; the background sink returns in microseconds and counts drops. | `tests/test_router.py::ObserveModeNeverTouchesTheRequestPath`, `tests/test_sinks.py::TheBackgroundSinkCostsTheCallerNothing` |
+| Nothing is served without a fitted calibrator when the policy says so. | `tests/test_generative.py`, `tests/test_router.py` (`require_calibrated`) |
+| A captured trace rebuilds the request it recorded. | `tests/test_router.py` (replay equivalence) |
+| The whole loop closes in under a second with nothing installed, for both kinds. | `tests/test_demo.py` |
 
 ## The parts
 
@@ -121,9 +182,9 @@ router.set_stage("serve")
 |---|---|
 | **contracts** | `Question`, `Capability` (kind = `decision` \| `generative`), `DecisionRequest`, `DecisionResult`, `DecisionExample`, and the trace envelope v2: a stable Praxis envelope, an opaque host partition key, an opaque payload. |
 | **ports** | Seven `Protocol`s: `DecisionModel`, `Teacher`, `Calibrator`, `Trainer`, `TraceSink`, `SchemaValidator`, `Registry`, plus the sibling `GenerativeModel`. One fake per port ships in `praxis_core.providers.fake`. |
-| **router** | Eight steps per call: policy, timed and bounded System-1 call, calibrate, validate, serve or abstain per question, teacher for the rest (everything, in shadow), record. |
-| **calibrator** | One temperature per (question type, option count), fitted on traces that carry both answers. No gradients, no dependency. |
-| **sinks** | JSONL and SQLite. Both round-trip the envelope and read back by capability. |
+| **router** | `DecisionRouter` and `GenerativeRouter`: eight steps per call: policy, timed and bounded System-1 call, calibrate, validate, serve or abstain, teacher for the rest (everything, in shadow), record. Plus `observe()`: the app's own answer becomes the trace. |
+| **calibrator** | One temperature per (question type, option count) for distributions; a Platt map for a scalar confidence. Both fitted on traces that carry both answers. No gradients, no dependency. |
+| **sinks** | JSONL and SQLite, and a background queue in front of either. All round-trip the envelope and read back by capability. |
 | **baseline** | The nearest-neighbour student behind the `DecisionModel` port: a distribution from similarity-weighted votes, the best similarity kept as `native_confidence`. Exists so the loop is demonstrably closed and a real model has a number to beat. |
 | **seam, gate, student, evaluate** | The original modules, kept for the generative path: the four-check gate, the confident-wrong metric, and a `LoraStudent` whose `fit` raises until a backend is wired in. |
 
@@ -131,16 +192,17 @@ router.set_stage("serve")
 
 | Port | Today | Planned (see [ROADMAP.md](ROADMAP.md)) |
 |---|---|---|
-| `DecisionModel` | `fake`, `nearest-neighbour` | a local Apple-Silicon decision model first, then a PyTorch one, a read-out layer over any open LLM, and an HTTP adapter for the hosted API and its self-hosted twin |
-| `Teacher` | `fake` | an OpenAI-compatible adapter (covers local servers and proxies), an Anthropic adapter |
-| `Calibrator` | `temperature` | Platt, isotonic |
+| `DecisionModel` | `fake`, `nearest-neighbour`, the chat-completions adapter (self-reported probabilities) | a local Apple-Silicon decision model, then a PyTorch one, a read-out layer over any open LLM, an HTTP adapter for the hosted decision API |
+| `GenerativeModel` | `fake`, `nearest-neighbour-generative`, the chat-completions adapter | a LoRA-tuned small model, after 1.0 |
+| `Teacher` | `fake`, the chat-completions adapter (any local server or proxy) | a first-party frontier adapter, after 1.0 |
+| `Calibrator` / `ScalarCalibrator` | `temperature`, `platt` | isotonic |
 | `Trainer` | `fake` | temperature refit, a closed-form head, the published fine-tuning path |
-| `TraceSink` | `jsonl`, `sqlite`, `fake` | Postgres, object store |
+| `TraceSink` | `jsonl`, `sqlite`, `queued`, `fake` | Postgres, object store |
 | `SchemaValidator` | `dict-of-types` | Pydantic, JSON Schema |
 | `Registry` | `fake` | a local JSON manifest |
 
-The core promises the contract, not an adapter. `pip install praxis` is standard library
-only; each adapter is a pip extra.
+The core promises the contract, not an adapter. The package is standard library only;
+each adapter beyond the two that ship with it is a pip extra.
 
 ## The training ladder
 
@@ -157,14 +219,18 @@ Rung A alone clears the gate for a large share of routing-type capabilities.
 |---|---|
 | [Architecture](docs/architecture.md) | The contract, the eight router steps, the envelope, and where each decision is made |
 | [Roadmap](ROADMAP.md) | Every planned feature with an ID, a status and an owner |
+| [v1.0 release plan](docs/release-plan-v1.0.md) | What the MVP is, what waits, and the gates |
+| [Changelog](CHANGELOG.md) | What changed in each version |
 | [Distillation](docs/distillation.md) | The generative path: wiring a LoRA student, and what to measure first |
 | [Contributing](CONTRIBUTING.md) | Running the checks, and what a change needs |
 
 ## Status
 
-Python 3.11+, standard library only at runtime. **114 tests**, run by CI on 3.11 to
-3.14; `mypy --strict` on the core, the providers and the CLI. Phases 0 (contracts) and 1
-(router, calibrator, capture) are done; Phase 2 (provider adapters) is next.
+Version **0.3.0**, the first milestone of the [v1.0 plan](docs/release-plan-v1.0.md).
+Python 3.11+, standard library only at runtime. **163 tests**, run by CI on 3.11 to
+3.14; `mypy --strict` on everything but the legacy modules. Distribution `praxis-core`,
+import `praxis_core`, command `praxis`; not on PyPI yet. Next: 0.4.0, trust the data and
+the eval ([ROADMAP.md](ROADMAP.md)).
 
 ## Licence
 
