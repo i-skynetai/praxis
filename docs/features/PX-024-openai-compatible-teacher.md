@@ -1,8 +1,17 @@
-# PX-024 — OpenAI-compatible teacher
+# PX-024 — OpenAI-compatible local adapter: student, System-1 and teacher
 
 **Status:** Proposed · **Owner:** — · **Issue:** —
 
-The first real System-2. Labels as in PX-020: **Verified** (where), **To verify**,
+> **Scope widened on 2026-09-30** after re-reading the original design: one adapter over
+> the OpenAI-compatible wire protocol plays three roles. As a **generative student**
+> (`GenerativeModel`: output against the capability's schema plus a self-reported
+> confidence), as a **System-1 for decision capabilities** (`DecisionModel`: a strict JSON
+> schema asking for a probability per option, calibrated by Praxis), and as a **teacher**
+> (the role this note was first written for). The wire contract below is the same in all
+> three; the prompt renderer and the response parser are shared. v1.0 ships it with no
+> log-probabilities; the sampling-based alternative is roadmap PX-131.
+
+The first real System-2, and the first any-model student. Labels as in PX-020: **Verified** (where), **To verify**,
 **Question**. Sources re-read 2026-09-30.
 
 ## What is missing today

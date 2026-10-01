@@ -4,11 +4,11 @@ Every planned feature has an ID, a status and, once someone takes it, an owner. 
 file is the source of truth for what is being worked on.** Pick from here, and update
 the row when you start and when you finish — see [Picking a feature](#picking-a-feature).
 
-The plan behind it: Praxis keeps capture → gate → train → evaluate → route with a
-permanent fallback, and makes the student a System-1 decision model behind a
-provider-neutral port. Phases 0 and 1 are done; the rows below are the rest, in the
-order the plan says to build them: providers, then evaluation, then data and the first
-training rungs, then fine-tuning.
+The target is **v1.0, the MVP** defined in [docs/release-plan-v1.0.md](docs/release-plan-v1.0.md):
+capture what the app's main model does, curate it, fit a small student of any kind
+without a GPU, measure it, ask Praxis whether it is ready, and serve it behind
+confidence routing with the main model as the permanent fallback. Releases 0.3.0 to
+0.6.0 are the milestones on the way; everything under "After 1.0" waits.
 
 ## Status
 
@@ -47,7 +47,7 @@ accepted.
 
 ## Features
 
-### 0.2.0 — the redesign lands
+### 0.2.0 — the redesign lands (done)
 
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
@@ -58,61 +58,77 @@ accepted.
 | PX-005 | [Nearest-neighbour baseline behind the `DecisionModel` port](#px-005) | baseline | P1 | S | Done | 0.2.0.dev0 |
 | PX-006 | [`praxis demo`: `support.triage` end to end in under a second](#px-006) | cli | P1 | S | Done | 0.2.0.dev0 |
 
-### 0.3.0 — providers
+### 0.3.0 — capture, and both capability kinds (M1)
 
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
-| PX-020 | [Apple-Silicon decision-model adapter (`laya-mlx`)](#px-020) | providers | P1 | M | Ready | |
-| PX-021 | [PyTorch decision-model adapter (`laya`)](#px-021) | providers | P1 | M | Ready | |
-| PX-022 | [Read-out adapter over any open causal LLM (`anyjev`)](#px-022) | providers | P1 | M | Ready | |
-| PX-023 | [HTTP adapter for the hosted decision API and its self-hosted twin (`systemone-http`)](#px-023) — *good first issue* | providers | P2 | S | Ready | |
-| PX-024 | [OpenAI-compatible teacher](#px-024) | providers | P1 | M | Ready | |
-| PX-025 | [Anthropic teacher](#px-025) — *good first issue* | providers | P2 | S | Ready | |
-| PX-026 | [`praxis doctor`](#px-026) | cli | P1 | M | Ready | |
-| PX-027 | [Adapter conformance suite](#px-027) | tests | P1 | M | Ready | |
+| PX-100 | [Observe-mode capture: the app's own answer becomes the trace](#px-100) | capture | P0 | M | Ready | |
+| PX-101 | [Background sink: capture adds no visible latency](#px-101) — *good first issue* | trace | P0 | S | Ready | |
+| PX-070 | [Generative capabilities through the same router](#px-070) | router | P0 | M | Ready | |
+| PX-080 | [Scalar confidence calibrator (Platt)](#px-080) — *good first issue* | calibrate | P1 | S | Ready | |
+| PX-104 | [A generative example capability beside `support.triage`](#px-104) | demo | P1 | S | Needs decision | |
+| PX-024 | [OpenAI-compatible local adapter: student, System-1 and teacher](#px-024) | providers | P1 | M | Ready | |
 | PX-028 | [pip extras per adapter, dependencies imported lazily](#px-028) | packaging | P1 | S | Ready | |
 
-### 0.4.0 — evaluation
+### 0.4.0 — trust the data, trust the eval (M2)
 
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
+| PX-040 | [Gate checks for decision traces](#px-040) | gate | P1 | S | Ready | |
+| PX-041 | [Decision dataset builder: split, decontamination report, manifest](#px-041) | data | P1 | L | Ready | |
 | PX-030 | [Decision scorecard: paired accuracy with McNemar and bootstrap CI](#px-030) | eval | P1 | M | Ready | |
 | PX-031 | [Calibration error before and after, per question type](#px-031) | eval | P1 | S | Ready | |
 | PX-032 | [Selective-risk curve and the operating point](#px-032) | eval | P1 | M | Ready | |
 | PX-033 | [Confident-wrong, abstain rate, latency and cost per thousand calls](#px-033) — *good first issue* | eval | P1 | S | Ready | |
 | PX-034 | [`praxis eval`: deterministic, with a teacher-versus-teacher sanity check](#px-034) | cli | P1 | M | Ready | |
 
-### 0.5.0 — data and Rungs A and B
+### 0.5.0 — registry, promotion, status (M3)
 
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
-| PX-040 | [Gate checks for decision traces](#px-040) | gate | P1 | S | Ready | |
-| PX-041 | [Decision dataset builder: split, decontamination report, manifest](#px-041) | data | P1 | L | Ready | |
+| PX-044 | [Local JSON registry, `praxis promote` and `praxis rollback`](#px-044) | registry | P1 | M | Ready | |
+| PX-110 | [`praxis status`: funnel, readiness verdict, offload share, capacity](#px-110) | cli | P0 | M | Ready | |
+| PX-026 | [`praxis doctor`](#px-026) | cli | P1 | M | Ready | |
+| PX-027 | [Adapter conformance suite](#px-027) | tests | P1 | M | Ready | |
+| PX-045 | [`praxis trace`, `build-dataset`, `calibrate`, `fit`](#px-045) | cli | P2 | M | Ready | |
+
+### 0.6.0 — students and training rungs A and B (M4)
+
+| ID | Feature | Area | P | Size | Status | Owner |
+|---|---|---|---|---|---|---|
+| PX-020 | [Apple-Silicon decision-model adapter (`laya-mlx`)](#px-020) | providers | P1 | M | Ready | |
 | PX-042 | [`temperature-refit` trainer](#px-042) — *good first issue* | train | P1 | S | Ready | |
-| PX-043 | [Closed-form head trainer over the read-out adapter (`anyjev-head`)](#px-043) | train | P1 | M | Ready | |
-| PX-044 | [Local JSON registry and `praxis promote`](#px-044) | registry | P1 | M | Ready | |
-| PX-045 | [`praxis init`, `trace`, `build-dataset`, `calibrate`, `train`](#px-045) | cli | P2 | M | Ready | |
-| PX-046 | [Outcome and feedback as late-bound labels](#px-046) | data | P2 | M | Needs decision | |
+| PX-111 | [Exemplar trainer: a small LLM learns from retrieved captured examples](#px-111) | train | P1 | M | Ready | |
+| PX-112 | [`praxis suggest`: the student catalogue, metadata only](#px-112) | cli | P1 | M | Ready | |
+| PX-046 | [Outcome and feedback as late-bound labels](#px-046) | data | P1 | M | Needs decision | |
 
-### 0.6.0 — Rung C
-
-| ID | Feature | Area | P | Size | Status | Owner |
-|---|---|---|---|---|---|---|
-| PX-050 | [Fine-tune trainer as a reproducible job, then recalibration](#px-050) | train | P2 | L | Needs decision | |
-
-### Later
+### 1.0.0 — release (M5)
 
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
-| PX-060 | [A host-side decision-provider adapter, in its own package](#px-060) | integration | P2 | S | Proposed | |
-| PX-070 | [Generative capabilities through the same router policy](#px-070) | router | P2 | M | Proposed | |
-| PX-071 | [LoRA trainer for generative students](#px-071) | train | P3 | L | Proposed | |
+| PX-120 | [Host integration guide: capture from your app in ten lines](#px-120) | docs | P0 | S | Ready | |
+| PX-121 | [CLI reference and README for 1.0](#px-121) | docs | P1 | S | Ready | |
+| PX-122 | [One-command definition-of-done test](#px-122) | tests | P0 | M | Ready | |
+| PX-090 | [Publish to PyPI](#px-090) | distribution | P0 | S | Needs decision | |
+
+### After 1.0
+
+| ID | Feature | Area | P | Size | Status | Owner |
+|---|---|---|---|---|---|---|
+| PX-071 | [LoRA trainer for generative students (`mlx-lm`, then `peft`)](#px-071) | train | P1 | L | Ready | |
+| PX-050 | [Fine-tune trainer for the decision model, then recalibration](#px-050) | train | P2 | L | Needs decision | |
+| PX-043 | [Closed-form head trainer over the read-out adapter (`anyjev-head`)](#px-043) | train | P2 | M | Ready | |
+| PX-022 | [Read-out adapter over any open causal LLM (`anyjev`)](#px-022) | providers | P2 | M | Ready | |
+| PX-021 | [PyTorch decision-model adapter (`laya`)](#px-021) | providers | P2 | M | Ready | |
+| PX-023 | [HTTP adapter for the hosted decision API and its self-hosted twin (`systemone-http`)](#px-023) — *good first issue* | providers | P2 | S | Ready | |
+| PX-025 | [Anthropic teacher](#px-025) — *good first issue* | providers | P2 | S | Ready | |
+| PX-082 | [Pydantic and JSON Schema validators](#px-082) | validate | P1 | S | Ready | |
 | PX-072 | [Async entry point for async hosts](#px-072) | router | P2 | M | Proposed | |
-| PX-080 | [Platt and isotonic calibrators](#px-080) | calibrate | P3 | S | Proposed | |
+| PX-060 | [A host-side decision-provider adapter, in its own package](#px-060) | integration | P2 | S | Proposed | |
 | PX-081 | [Postgres and object-store trace sink](#px-081) | trace | P3 | M | Proposed | |
-| PX-082 | [Pydantic and JSON Schema validators](#px-082) | validate | P3 | S | Proposed | |
 | PX-083 | [Web dashboard and REST control plane](#px-083) | ui | P3 | L | Proposed | |
-| PX-090 | [Publish to PyPI](#px-090) | distribution | P1 | S | Needs decision | |
+| PX-130 | [Synthetic and self-play generator, estimate before spend](#px-130) | data | P3 | L | Proposed | |
+| PX-131 | [Sampling-based confidence for small LLMs (self-consistency)](#px-131) | calibrate | P2 | M | Proposed | |
 
 ## Details
 
@@ -148,7 +164,45 @@ is reported, not learned.
 <a id="px-006"></a>**PX-006 — Demo.** *Done in* `praxis/demo.py`, `praxis/cli.py`: four
 stages, deterministic for a seed, under a second, runs in CI with nothing installed.
 
-### 0.3.0 — providers
+### 0.3.0 — capture, and both capability kinds
+
+<a id="px-100"></a>**PX-100 — Observe-mode capture.** Today Praxis must make the System-2
+call itself. The original design's wedge is the other way round: the app keeps calling
+its own model and hands Praxis the result (§01 A.8, §04 S1/S2). *Done when:* the router
+gains `observe(request, answer, info, latency_ms, cost_usd)` for both kinds; the app's
+answer is validated and recorded as System-2 with the student run in shadow when one is
+configured; it never raises; a stored trace rebuilds the exact request (replay
+equivalence) in a test; the demo has an observe-mode stage. *Starts in:*
+`praxis/core/router.py`.
+
+<a id="px-101"></a>**PX-101 — Background sink.** `record` writes synchronously today.
+*Done when:* a queue and one daemon thread sit in front of any sink; `record` returns in
+microseconds; the queue is bounded and drops are counted on the router's stats, never
+raised; `flush()` exists for tests and shutdown; a test shows ≤ 5 ms added at p95 over
+1,000 calls. *Starts in:* `praxis/core/trace.py`.
+
+<a id="px-104"></a>**PX-104 — A generative example capability.** *Decision needed:*
+`support.extract` (order id, product and issue from the same tickets; recommended) or a
+`rationale` field on `support.triage` (the original PRD's shape). *Done when:* the demo
+runs it through observe mode and the generative router with the fake student and
+teacher, under the same one-second budget.
+
+<a id="px-070"></a>**PX-070 — Generative capabilities through the same router.** The
+`GenerativeModel` port is declared and `DecisionRouter` refuses generative capabilities.
+*Done when:* a generative capability routes with the same stages, abstain reasons, trace
+and stats; validity through the `SchemaValidator` port is the hard gate; the scalar
+confidence goes through PX-080; "matched the label" is exact after normalisation by
+default with a host-supplied match function allowed; the fault-injection suite passes for
+the generative kind exactly as for the decision kind. *Starts in:* `praxis/core/router.py`,
+`praxis/core/contracts.py` (output and schema fields on the trace).
+
+<a id="px-080"></a>**PX-080 — Scalar confidence calibrator (Platt).** The temperature
+calibrator works on distributions; a generative student reports one number. *Done
+when:* a Platt calibrator (two parameters, fitted by a stdlib optimiser on (confidence,
+matched) pairs) sits behind the same `Calibrator` port, is selected per capability kind,
+and lowers calibration error on a synthetic over-confident student in a test.
+
+### Adapters and providers
 
 Before writing any adapter, re-read the provider's current README: these APIs were days
 old when the plan was written and move. Each adapter maps the provider's confidence into
@@ -180,11 +234,17 @@ against a recorded fixture and against a live endpoint when a key is present; a 
 is an abstention. *Starts in:* `praxis/providers/systemone_http.py`, standard-library
 `urllib` only.
 
-<a id="px-024"></a>**PX-024 — OpenAI-compatible teacher.** Covers local servers and
-proxies that speak the same API. *Done when:* a `DecisionRequest` becomes one
-structured-output call, the typed answers are validated against the declared set, and a
-provider distribution is captured when exposed (log-probabilities); a recorded fixture
-runs in CI. *Starts in:* `praxis/providers/openai_compat.py`.
+<a id="px-024"></a>**PX-024 — OpenAI-compatible local adapter: student, System-1 and teacher.**
+One class over the wire protocol that local servers, proxies and the hosted API share
+(verified on a local Ollama this session: a strict JSON schema with string-enum,
+integer-enum and boolean fields was honoured). Three roles from one request shape: a
+`GenerativeModel` student (output against the schema plus a self-reported confidence),
+a `DecisionModel` for choice / score / boolean (self-reported probabilities, calibrated
+by Praxis; no log-probabilities in 1.0), and a `Teacher`. *Done when:* offline tests run
+against a stdlib fake HTTP server (refusal, malformed body, 500); a live test runs against
+a local server only when `PRAXIS_LIVE=1`; the demo runs with `--student` and `--teacher`
+pointing at it. *Starts in:* `praxis/providers/openai_compat.py`; design note
+[docs/features/PX-024-openai-compatible-teacher.md](docs/features/PX-024-openai-compatible-teacher.md).
 
 <a id="px-025"></a>**PX-025 — Anthropic teacher.** As PX-024, with the provider's own
 structured-output mechanism. *Starts in:* `praxis/providers/anthropic.py`.
@@ -205,7 +265,7 @@ installed. *Starts in:* `tests/conformance.py`, parameterised by the fakes first
 declares one extra per adapter; `import praxis.providers` pulls no vendor SDK; importing
 an adapter without its extra raises a message naming the extra to install.
 
-### 0.4.0 — evaluation
+### 0.4.0 — trust the data, trust the eval
 
 <a id="px-030"></a>**PX-030 — Decision scorecard.** Today `praxis/evaluate.py` scores the
 generative student only. *Done when:* per capability and per question type, accuracy
@@ -230,7 +290,7 @@ the scorecard; a teacher-versus-teacher run yields a win rate near 0.5 with an i
 spanning zero; the promotion rules (hard gates are vetoes, no stratum regresses,
 calibration error above 0.10 blocks raising the share) are applied and reported.
 
-### 0.5.0 — data and Rungs A and B
+### Data, registry and training rungs
 
 <a id="px-040"></a>**PX-040 — Gate checks for decision traces.** The four-check gate in
 `praxis/gate.py` knows only generative traces. *Done when:* a decision trace is refused
@@ -265,7 +325,7 @@ has `outcome` and `feedback`; nothing writes them. *Decision needed:* the
 `record_outcome(trace_id, ...)` API and how an outcome-derived label is expressed per
 question type.
 
-### 0.6.0 — Rung C
+### Fine-tuning (after 1.0)
 
 <a id="px-050"></a>**PX-050 — Fine-tune trainer.** The published fine-tuning path for
 the encoder decision model, wrapped as a reproducible job, then recalibration.
@@ -275,26 +335,69 @@ plan accepts that this may be a cloud-notebook step for Apple users. *Done when:
 fine-tuned model beats Rung B on the held-out set with a confidence interval and no
 stratum regresses.
 
-### Later
+### 0.5.0 — registry, promotion, status
+
+<a id="px-110"></a>**PX-110 — `praxis status`.** The question the owner asks: is this
+student ready, what share can it take, how much traffic can it hold. *Done when:* from
+the sink and the registry it prints the funnel (captured → gated → labelled), shadow
+agreement, calibration error, confident-wrong rate, the offload share at the current
+threshold, latency p50 and p95 for student and teacher, a throughput floor (one worker at
+p50, stated as a floor), and a verdict (`shadow` / `canary` / `serve`) against the v1.0
+gates with every missing item named ("need 140 more labels"); fixtures cover each
+verdict. *Starts in:* `praxis/cli.py`, `praxis/core/evaluate.py`.
+
+### 0.6.0 — students and training rungs
+
+<a id="px-111"></a>**PX-111 — Exemplar trainer.** Rung 0 of the original ladder: "fit"
+indexes the captured examples; at serve time the k most similar captured (input →
+output) pairs are the demonstrations in the small LLM's prompt. *Done when:* a `Trainer`
+produces a `ModelArtifact` that the OpenAI-compatible adapter loads; on the demo
+capability the scorecard with exemplars beats zero-shot; k and the similarity are
+recorded in the artifact. *Starts in:* `praxis/learning/exemplar.py`.
+
+<a id="px-112"></a>**PX-112 — `praxis suggest`.** *Done when:* a JSON catalogue inside
+the package lists, per capability shape, the student types that fit, the runtime, size,
+licence, the Praxis rungs that apply, how to install, and a `verified_on` date; `praxis
+suggest <capability>` prints the matching entries; every entry was checked against its
+README on the date shown; no weights are shipped or downloaded by the command.
+
+### 1.0.0 — release
+
+<a id="px-120"></a>**PX-120 — Host integration guide.** *Done when:* `docs/integration.md`
+shows capture from an existing app in ten lines for both kinds, the migration stages
+(observe → shadow student → canary → serve), what the app must supply, and what it
+never has to change.
+
+<a id="px-121"></a>**PX-121 — CLI reference and README for 1.0.** Every command, every
+flag, one example each; the README demo output refreshed from a real run.
+
+<a id="px-122"></a>**PX-122 — One-command definition-of-done test.** *Done when:* one test
+runs capture → gate → build-dataset → fit → eval → promote → serve on the demo capability
+with the fakes and asserts every gate in [docs/release-plan-v1.0.md](docs/release-plan-v1.0.md) §2.
+
+### After 1.0
+
+<a id="px-130"></a>**PX-130 — Synthetic and self-play generator.** The original's
+cold-start tool, with estimate-before-spend; deferred because production capture needs
+no cold start (original §06 §6.10).
+
+<a id="px-131"></a>**PX-131 — Sampling-based confidence for small LLMs.** N samples per
+call give an empirical distribution when self-report proves uncalibrated; N times the
+cost, so only if `status` shows calibration error above 0.10 after Platt.
 
 <a id="px-060"></a>**PX-060 — A host-side decision-provider adapter.** A host that has
 its own decision-provider interface gets a thin mapping package that depends on Praxis,
 never the reverse. Blocked until that host's interface exists.
 
-<a id="px-070"></a>**PX-070 — Generative capabilities through the same router policy.**
-`GenerativeModel` is declared; `DecisionRouter` refuses generative capabilities. *Done
-when:* a generative capability routes with the same stages, abstain and trace, with the
-`SchemaValidator` as the validity check.
-
-<a id="px-071"></a>**PX-071 — LoRA trainer for generative students.** Rung D:
-`LoraStudent.fit` stops raising. See [docs/distillation.md](docs/distillation.md).
+<a id="px-071"></a>**PX-071 — LoRA trainer for generative students.** Rung 1 of the original
+ladder: fine-tune a small base on the dataset with `mlx-lm` on Apple Silicon, then
+`peft` elsewhere; serve the adapter through the OpenAI-compatible adapter. The first
+feature after 1.0, because it needs GPU time and a serving step, and the loop is proven
+without it. `LoraStudent.fit` stops raising. See [docs/distillation.md](docs/distillation.md).
 
 <a id="px-072"></a>**PX-072 — Async entry point.** `decide()` is synchronous and bounds
 System-1 with a thread. *Done when:* `adecide()` awaits async adapters end to end with
 the same guarantees, proven by the same fault-injection tests.
-
-<a id="px-080"></a>**PX-080 — Platt and isotonic calibrators.** Behind the same port,
-selected per capability, compared on calibration error.
 
 <a id="px-081"></a>**PX-081 — Postgres and object-store trace sink.** The envelope in a
 table, payloads in object storage keyed by trace id, as an optional sink.
@@ -305,5 +408,8 @@ table, payloads in object storage keyed by trace id, as an optional sink.
 <a id="px-083"></a>**PX-083 — Web dashboard and REST control plane.** Deliberately not in
 v1; the CLI and JSON artifacts are the interface until the loop is proven.
 
-<a id="px-090"></a>**PX-090 — Publish to PyPI.** `pip install praxis`, released by
-trusted publishing from the release workflow. A maintainer decision.
+<a id="px-090"></a>**PX-090 — Publish to PyPI.** **Verified** 2026-09-30: `praxis` and
+`praxis-ai` are taken on PyPI; `praxis-core` and `praxis-learning` are free. *Decision
+needed:* the distribution name (recommendation: `praxis-core`, import name `praxis`).
+*Done when:* trusted publishing from the release workflow; `pip install <name>` on a clean
+machine runs `python -m praxis demo`.
