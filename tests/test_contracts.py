@@ -1,5 +1,6 @@
 """Phase 0: the contracts round-trip, the fakes satisfy the ports, the package outside
 ``providers`` is standard library only, and a fake end-to-end decide() returns a DecisionResult."""
+
 from __future__ import annotations
 
 import ast
@@ -33,10 +34,9 @@ from praxis_core.ports import (
     Registry,
     SchemaValidator,
     Teacher,
-    Trainer,
     TraceSink,
+    Trainer,
 )
-from praxis_core.router import DecisionRouter, RoutingPolicy
 from praxis_core.providers.fake import (
     FakeCalibrator,
     FakeDecisionModel,
@@ -47,6 +47,7 @@ from praxis_core.providers.fake import (
     FakeTraceSink,
     FakeTrainer,
 )
+from praxis_core.router import DecisionRouter, RoutingPolicy
 from tests.helpers import DEPARTMENTS, URGENCY, oracle, triage_capability
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -135,8 +136,9 @@ class CapabilitiesDeclareTheirKind(unittest.TestCase):
     def test_a_generative_capability_needs_a_schema(self):
         with self.assertRaises(ValueError):
             Capability("support.reply", kind="generative", instructions="Write a reply.")
-        cap = Capability("support.reply", kind="generative", instructions="Write a reply.",
-                         output_schema={"reply": "str"})
+        cap = Capability(
+            "support.reply", kind="generative", instructions="Write a reply.", output_schema={"reply": "str"}
+        )
         self.assertEqual(cap.kind, "generative")
 
     def test_request_carries_the_declared_questions(self):
@@ -151,19 +153,50 @@ def _trace() -> TraceEvent:
     cap = triage_capability()
     q = cap.questions["department"]
     return TraceEvent(
-        trace_id="t1", capability=cap.name, capability_kind="decision", capability_hash=cap.definition_hash,
-        stage="shadow", answered_by="system2", abstain=False, state={"subject": "invoice wrong"},
-        questions=[QuestionTrace("department", "choice", q.definition_hash, q, "system2", False,
-                                 answer="billing", system1_answer="technical", system2_answer="billing",
-                                 raw_distribution={"billing": 0.4, "technical": 0.6, "account": 0.0, "sales": 0.0},
-                                 calibrated_distribution={"billing": 0.45, "technical": 0.55, "account": 0.0, "sales": 0.0},
-                                 confidence=0.31, native_confidence=0.6, calibrator_version="temperature-v1/abc",
-                                 system2_distribution={"billing": 1.0, "technical": 0.0, "account": 0.0, "sales": 0.0},
-                                 reason="shadow: teacher serves; system1 recorded")],
-        parent_trace_id=None, reason="", system1=ModelInfo("fake", "fake-system1", "0", "raw"),
-        system2=ModelInfo("fake", "fake-teacher", "0"), system1_latency_ms=1.5, system2_latency_ms=20.0,
-        latency_ms=22.0, cost_usd=0.001, system1_error=None, success=True, source="synthetic",
-        label_candidate=True, host_partition="tenant-a", caller="tests", outcome={"resolved": True})
+        trace_id="t1",
+        capability=cap.name,
+        capability_kind="decision",
+        capability_hash=cap.definition_hash,
+        stage="shadow",
+        answered_by="system2",
+        abstain=False,
+        state={"subject": "invoice wrong"},
+        questions=[
+            QuestionTrace(
+                "department",
+                "choice",
+                q.definition_hash,
+                q,
+                "system2",
+                False,
+                answer="billing",
+                system1_answer="technical",
+                system2_answer="billing",
+                raw_distribution={"billing": 0.4, "technical": 0.6, "account": 0.0, "sales": 0.0},
+                calibrated_distribution={"billing": 0.45, "technical": 0.55, "account": 0.0, "sales": 0.0},
+                confidence=0.31,
+                native_confidence=0.6,
+                calibrator_version="temperature-v1/abc",
+                system2_distribution={"billing": 1.0, "technical": 0.0, "account": 0.0, "sales": 0.0},
+                reason="shadow: teacher serves; system1 recorded",
+            )
+        ],
+        parent_trace_id=None,
+        reason="",
+        system1=ModelInfo("fake", "fake-system1", "0", "raw"),
+        system2=ModelInfo("fake", "fake-teacher", "0"),
+        system1_latency_ms=1.5,
+        system2_latency_ms=20.0,
+        latency_ms=22.0,
+        cost_usd=0.001,
+        system1_error=None,
+        success=True,
+        source="synthetic",
+        label_candidate=True,
+        host_partition="tenant-a",
+        caller="tests",
+        outcome={"resolved": True},
+    )
 
 
 class ContractsRoundTrip(unittest.TestCase):
@@ -185,19 +218,71 @@ class ContractsRoundTrip(unittest.TestCase):
         self.assertEqual(again.context.budget, Budget(500, 0.01))
 
     def test_result(self):
-        r = DecisionResult("urgency", 2, {"0": 0.1, "1": 0.2, "2": 0.6, "3": 0.1}, 0.42, 0.6, True, False,
-                           "system1", "fake", "fake-system1", "0", "raw", 1.2, 0.0, "t1", 1.7, "")
+        r = DecisionResult(
+            "urgency",
+            2,
+            {"0": 0.1, "1": 0.2, "2": 0.6, "3": 0.1},
+            0.42,
+            0.6,
+            True,
+            False,
+            "system1",
+            "fake",
+            "fake-system1",
+            "0",
+            "raw",
+            1.2,
+            0.0,
+            "t1",
+            1.7,
+            "",
+        )
         self.assertEqual(DecisionResult.from_dict(json.loads(json.dumps(r.to_dict()))), r)
-        b = DecisionResult("churn_risk", True, {"true": 0.9, "false": 0.1}, 0.53, None, False, True,
-                           "system2", "fake", "fake-teacher", "0", "", 20.0, 0.001, "t1", None, "below threshold")
+        b = DecisionResult(
+            "churn_risk",
+            True,
+            {"true": 0.9, "false": 0.1},
+            0.53,
+            None,
+            False,
+            True,
+            "system2",
+            "fake",
+            "fake-teacher",
+            "0",
+            "",
+            20.0,
+            0.001,
+            "t1",
+            None,
+            "below threshold",
+        )
         self.assertIs(DecisionResult.from_dict(json.loads(json.dumps(b.to_dict()))).answer, True)
 
     def test_example_and_artifact(self):
-        ex = DecisionExample("support.triage", "department", "choice", {"subject": "x"},
-                             {"options": DEPARTMENTS}, "billing", "system2", None, {"trace_id": "t1"})
+        ex = DecisionExample(
+            "support.triage",
+            "department",
+            "choice",
+            {"subject": "x"},
+            {"options": DEPARTMENTS},
+            "billing",
+            "system2",
+            None,
+            {"trace_id": "t1"},
+        )
         self.assertEqual(DecisionExample.from_dict(json.loads(json.dumps(ex.to_dict()))), ex)
-        art = ModelArtifact("support.triage", "nn", "3", "baseline", "nearest-neighbour", "", "file:///x",
-                            {"acc": 0.9}, "2026-09-30T00:00:00+00:00")
+        art = ModelArtifact(
+            "support.triage",
+            "nn",
+            "3",
+            "baseline",
+            "nearest-neighbour",
+            "",
+            "file:///x",
+            {"acc": 0.9},
+            "2026-09-30T00:00:00+00:00",
+        )
         self.assertEqual(ModelArtifact.from_dict(json.loads(json.dumps(art.to_dict()))), art)
 
     def test_trace_envelope_v2(self):
@@ -229,7 +314,9 @@ class TheFakesSatisfyThePorts(unittest.TestCase):
     def test_the_fake_registry_and_trainer_close_the_loop(self):
         ex = DecisionExample("support.triage", "department", "choice", "x", {}, "billing")
         art = FakeTrainer().train([ex, ex])
-        reg = FakeRegistry(); reg.register(art); reg.set_stage(art.capability, art.version, "shadow")
+        reg = FakeRegistry()
+        reg.register(art)
+        reg.set_stage(art.capability, art.version, "shadow")
         self.assertEqual(reg.get("support.triage"), art)
         self.assertEqual(reg.manifest("support.triage")["versions"][0]["stage"], "shadow")
         with self.assertRaises(KeyError):
@@ -259,8 +346,10 @@ class TheCoreIsStandardLibraryOnly(unittest.TestCase):
     def test_core_imports_only_the_standard_library(self):
         for path in self._core_files():
             for name in self._imports(path):
-                self.assertTrue(name == "praxis_core" or name in sys.stdlib_module_names,
-                                f"{path.relative_to(ROOT)} imports {name}, which is not standard library")
+                self.assertTrue(
+                    name == "praxis_core" or name in sys.stdlib_module_names,
+                    f"{path.relative_to(ROOT)} imports {name}, which is not standard library",
+                )
 
     def test_no_provider_name_appears_outside_providers(self):
         for path in self._core_files():
@@ -273,8 +362,14 @@ class AFakeEndToEndDecideReturnsAResult(unittest.TestCase):
     def test_decide_returns_one_result_per_question_and_records_a_trace(self):
         cap = triage_capability()
         sink = FakeTraceSink()
-        router = DecisionRouter(cap, FakeTeacher(oracle), FakeDecisionModel(peak=0.97), FakeCalibrator(), sink,
-                                RoutingPolicy(threshold=0.5, stage="serve"))
+        router = DecisionRouter(
+            cap,
+            FakeTeacher(oracle),
+            FakeDecisionModel(peak=0.97),
+            FakeCalibrator(),
+            sink,
+            RoutingPolicy(threshold=0.5, stage="serve"),
+        )
         results = router.decide(cap.request({"subject": "invoice charged twice", "body": "please refund"}))
         self.assertEqual(set(results), {"department", "urgency", "churn_risk"})
         for name, result in results.items():
@@ -283,7 +378,9 @@ class AFakeEndToEndDecideReturnsAResult(unittest.TestCase):
             self.assertEqual(DecisionResult.from_dict(result.to_dict()), result)
             self.assertAlmostEqual(sum(result.distribution.values()), 1.0, places=6)
         self.assertEqual(results["department"].answered_by, "system1")
-        self.assertAlmostEqual(results["urgency"].expected_value or 0.0, 0.06, places=9)  # 0.97 on level 0, 0.01 on each of 1, 2, 3
+        self.assertAlmostEqual(
+            results["urgency"].expected_value or 0.0, 0.06, places=9
+        )  # 0.97 on level 0, 0.01 on each of 1, 2, 3
         self.assertEqual(len(sink.traces), 1)
         self.assertEqual(sink.traces[0].trace_id, results["department"].trace_id)
         self.assertEqual(TraceEvent.from_json(sink.traces[0].to_json()), sink.traces[0])
@@ -297,8 +394,12 @@ class AFakeEndToEndDecideReturnsAResult(unittest.TestCase):
 @unittest.skipUnless(importlib.util.find_spec("mypy"), "mypy is not installed in this interpreter")
 class MypyStrictIsCleanOnTheCore(unittest.TestCase):
     def test_mypy_strict(self):
-        proc = subprocess.run([sys.executable, "-m", "mypy"],   # scope and strictness come from pyproject.toml
-                              cwd=ROOT, capture_output=True, text=True)
+        proc = subprocess.run(
+            [sys.executable, "-m", "mypy"],  # scope and strictness come from pyproject.toml
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 

@@ -22,10 +22,12 @@ confidence) the sibling is ``PlattCalibrator``: a two-parameter logistic fit,
 ``p = sigmoid(a · logit(c) + b)``, on (confidence, matched the label) pairs, solved by
 Newton's method with a little ridge so a perfectly separable sample cannot blow up.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from .contracts import Distribution, Question, TraceEvent, stable_hash
 
@@ -44,19 +46,25 @@ def scale(distribution: Mapping[str, float], keys: Sequence[str], temperature: f
     top = max(logits)
     weights = [math.exp(z - top) for z in logits]
     total = sum(weights)
-    return {k: w / total for k, w in zip(keys, weights)}
+    return {k: w / total for k, w in zip(keys, weights, strict=False)}
 
 
-def negative_log_likelihood(items: Sequence[tuple[Distribution, str]], keys_of: Sequence[Sequence[str]],
-                            temperature: float) -> float:
+def negative_log_likelihood(
+    items: Sequence[tuple[Distribution, str]], keys_of: Sequence[Sequence[str]], temperature: float
+) -> float:
     total = 0.0
-    for (distribution, label), keys in zip(items, keys_of):
+    for (distribution, label), keys in zip(items, keys_of, strict=False):
         total -= math.log(max(scale(distribution, keys, temperature).get(label, 0.0), _EPS))
     return total / max(1, len(items))
 
 
-def fit_temperature(items: Sequence[tuple[Distribution, str]], keys_of: Sequence[Sequence[str]],
-                    t_min: float = 0.05, t_max: float = 50.0, iterations: int = 80) -> float:
+def fit_temperature(
+    items: Sequence[tuple[Distribution, str]],
+    keys_of: Sequence[Sequence[str]],
+    t_min: float = 0.05,
+    t_max: float = 50.0,
+    iterations: int = 80,
+) -> float:
     """Golden-section search over ``log T``. Deterministic; no dependency."""
     lo, hi = math.log(t_min), math.log(t_max)
     phi = (math.sqrt(5.0) - 1.0) / 2.0
@@ -83,7 +91,7 @@ def expected_calibration_error(max_probabilities: Sequence[float], corrects: Seq
     if n == 0:
         return 0.0
     sums = [[0.0, 0.0, 0] for _ in range(bins)]
-    for p, ok in zip(max_probabilities, corrects):
+    for p, ok in zip(max_probabilities, corrects, strict=False):
         index = min(bins - 1, max(0, int(p * bins)))
         sums[index][0] += p
         sums[index][1] += 1.0 if ok else 0.0
@@ -127,7 +135,7 @@ class TemperatureCalibrator:
                     continue
                 question = q.question.as_choice()
                 try:
-                    label = q.question.key_for(q.system2_answer)   # a rank answer maps to its top key
+                    label = q.question.key_for(q.system2_answer)  # a rank answer maps to its top key
                 except ValueError:
                     continue
                 group = _group_key(question)
@@ -161,6 +169,7 @@ class TemperatureCalibrator:
 
 # ------------------------------------------------------------------ scalar scores
 
+
 def sigmoid(x: float) -> float:
     if x >= 0:
         return 1.0 / (1.0 + math.exp(-x))
@@ -175,7 +184,7 @@ def logit(p: float, eps: float = 1e-6) -> float:
 
 def _platt_nll(xs: Sequence[float], ys: Sequence[float], a: float, b: float, ridge: float) -> float:
     total = 0.5 * ridge * ((a - 1.0) ** 2 + b * b)
-    for x, y in zip(xs, ys):
+    for x, y in zip(xs, ys, strict=False):
         z = a * x + b
         # log(1 + exp(z)) computed stably, minus y*z
         total += (max(z, 0.0) + math.log1p(math.exp(-abs(z)))) - y * z
@@ -195,11 +204,11 @@ def fit_platt(pairs: Sequence[tuple[float, bool]], ridge: float = 1e-3, iteratio
         g_a = ridge * (a - 1.0)
         g_b = ridge * b
         h_aa, h_ab, h_bb = ridge, 0.0, ridge
-        for x, y in zip(xs, ys):
+        for x, y in zip(xs, ys, strict=False):
             p = sigmoid(a * x + b)
             w = p * (1.0 - p)
             g_a += (p - y) * x
-            g_b += (p - y)
+            g_b += p - y
             h_aa += w * x * x
             h_ab += w * x
             h_bb += w

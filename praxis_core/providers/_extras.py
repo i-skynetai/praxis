@@ -1,5 +1,6 @@
 """The one rule every adapter follows: its dependency is a pip extra, imported lazily, and a
 missing one fails with the install line, not a traceback from deep inside a vendor SDK."""
+
 from __future__ import annotations
 
 import importlib
@@ -14,5 +15,6 @@ def require(module: str, extra: str, purpose: str = "") -> ModuleType:
         return importlib.import_module(module)
     except ImportError as exc:
         what = f" for {purpose}" if purpose else ""
-        raise ImportError(f"{module!r} is not installed{what}. Install the extra: "
-                          f"pip install \"{DISTRIBUTION}[{extra}]\"") from exc
+        raise ImportError(
+            f'{module!r} is not installed{what}. Install the extra: pip install "{DISTRIBUTION}[{extra}]"'
+        ) from exc

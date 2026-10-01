@@ -109,6 +109,8 @@ accepted.
 | PX-120 | [Host integration guide: capture from your app in ten lines](#px-120) | docs | P0 | S | Ready | |
 | PX-121 | [CLI reference and README for 1.0](#px-121) | docs | P1 | S | Ready | |
 | PX-122 | [One-command definition-of-done test](#px-122) | tests | P0 | M | Ready | |
+| PX-123 | [First-run audit: a stranger clones, runs, reads](#px-123) — *good first issue* | docs | P0 | S | Ready | |
+| PX-124 | [Decision log, linter, formatter, `make check`](#px-124) | docs | P0 | S | Done | 0.3.1 |
 | PX-090 | [Publish to PyPI](#px-090) | distribution | P0 | S | Ready | |
 
 ### After 1.0
@@ -369,6 +371,15 @@ never has to change.
 
 <a id="px-121"></a>**PX-121 — CLI reference and README for 1.0.** Every command, every
 flag, one example each; the README demo output refreshed from a real run.
+
+<a id="px-123"></a>**PX-123 — First-run audit.** Before every release someone who did not
+build it clones the repository, runs `python -m praxis_core demo` and `make check`, reads
+the README top to bottom, and writes down everything that confused them. *Done when:*
+the list is empty or every item has a fix or a roadmap row. Repeats per release.
+
+<a id="px-124"></a>**PX-124 — Decision log, linter, formatter, `make check`.** *Done in*
+0.3.1: `docs/decisions.md`, ruff (lint and format) in `pyproject.toml` and CI, a Makefile
+whose `check` target is what CI runs.
 
 <a id="px-122"></a>**PX-122 — One-command definition-of-done test.** *Done when:* one test
 runs capture → gate → build-dataset → fit → eval → promote → serve on the demo capability

@@ -175,6 +175,31 @@ valid schema, within the latency bound, not a duplicate; rejections counted by r
 deflection). The `GenerativeModel` port is declared; routing generative capabilities
 through the same policy is a later milestone (see [ROADMAP.md](../ROADMAP.md)).
 
+## Ports and adapters
+
+| Port | Today | Planned (see [ROADMAP.md](../ROADMAP.md)) |
+|---|---|---|
+| `DecisionModel` | `fake`, `nearest-neighbour`, the chat-completions adapter (self-reported probabilities) | a local Apple-Silicon decision model, then a PyTorch one, a read-out layer over any open LLM, an HTTP adapter for the hosted decision API |
+| `GenerativeModel` | `fake`, `nearest-neighbour-generative`, the chat-completions adapter | a LoRA-tuned small model, after 1.0 |
+| `Teacher` | `fake`, the chat-completions adapter (any local server or proxy) | a first-party frontier adapter, after 1.0 |
+| `Calibrator` / `ScalarCalibrator` | `temperature`, `platt` | isotonic |
+| `Trainer` | `fake` | temperature refit, a closed-form head, the published fine-tuning path |
+| `TraceSink` | `jsonl`, `sqlite`, `queued`, `fake` | Postgres, object store |
+| `SchemaValidator` | `dict-of-types` | Pydantic, JSON Schema |
+| `Registry` | `fake` | a local JSON manifest |
+
+The core promises the contract, not an adapter. The package is standard library only;
+each adapter beyond the two that ship with it is a pip extra.
+
+## The training ladder
+
+Climb per capability and stop at the first rung whose scorecard clears the gate.
+**A** use a pretrained decision model as shipped and fit a temperature on gated traces
+(minutes, CPU). **B** fit a head or a threshold on labelled traces, no gradients
+(seconds). **C** fine-tune the decision model on the decision dataset, then recalibrate
+(hours, a small GPU). **D** LoRA a small causal LM, for generative capabilities only.
+Rung A alone clears the gate for a large share of routing-type capabilities.
+
 ## What is deliberately not here
 
 A web dashboard, a REST control plane, role-based access, cloud deployment, Postgres as

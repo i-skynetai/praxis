@@ -5,10 +5,12 @@ so the router's guarantees are proven against a hostile adapter rather than assu
 They are also what ``python -m praxis demo`` runs on, which is why the demo needs no
 installs and no keys.
 """
+
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any
 
 from praxis_core.contracts import (
     Answer,
@@ -31,7 +33,14 @@ Picker = Callable[[State, str, Question], str]
 Oracle = Callable[[State, str, Question], Answer]
 
 MALFORMED_MODES: tuple[str, ...] = (
-    "not-a-mapping", "missing-question", "unknown-key", "bad-sum", "nan", "negative", "empty", "not-numbers",
+    "not-a-mapping",
+    "missing-question",
+    "unknown-key",
+    "bad-sum",
+    "nan",
+    "negative",
+    "empty",
+    "not-numbers",
 )
 
 
@@ -47,14 +56,23 @@ class FakeDecisionModel:
     """A System-1 that answers by a rule, or misbehaves on request.
 
     ``pick`` chooses the key per question (default: the first key). ``peak`` is the mass
-    put on it, one value for every question or a mapping by question name. ``fail`` is raised on every call. ``delay_s`` stalls each call, which is
-    how a timeout is injected. ``malformed`` selects one of ``MALFORMED_MODES``.
+    put on it, one value for every question or a mapping by question name. ``fail`` is
+    raised on every call. ``delay_s`` stalls each call, which is how a timeout is injected.
+    ``malformed`` selects one of ``MALFORMED_MODES``.
     """
 
-    def __init__(self, pick: Picker | None = None, peak: float | Mapping[str, float] = 0.9, *,
-                 fail: BaseException | None = None,
-                 delay_s: float = 0.0, malformed: str | None = None, native_confidence: float | None = None,
-                 cost_usd: float = 0.0, info: ModelInfo | None = None) -> None:
+    def __init__(
+        self,
+        pick: Picker | None = None,
+        peak: float | Mapping[str, float] = 0.9,
+        *,
+        fail: BaseException | None = None,
+        delay_s: float = 0.0,
+        malformed: str | None = None,
+        native_confidence: float | None = None,
+        cost_usd: float = 0.0,
+        info: ModelInfo | None = None,
+    ) -> None:
         if malformed is not None and malformed not in MALFORMED_MODES:
             raise ValueError(f"malformed must be one of {MALFORMED_MODES}")
         self.pick = pick
@@ -84,9 +102,11 @@ class FakeDecisionModel:
             keys = question.keys()
             key = self.pick(state, name, question) if self.pick else keys[0]
             peak = self.peak[name] if isinstance(self.peak, Mapping) else self.peak
-            out[name] = RawAnswer(peaked(keys, key, peak),
-                                  peak if self.native_confidence is None else self.native_confidence,
-                                  self.cost_usd)
+            out[name] = RawAnswer(
+                peaked(keys, key, peak),
+                peak if self.native_confidence is None else self.native_confidence,
+                self.cost_usd,
+            )
         return out
 
     def _garbage(self, questions: Mapping[str, Question]) -> object:
@@ -118,8 +138,16 @@ class FakeDecisionModel:
 class FakeTeacher:
     """A System-2 that answers by an oracle rule, with an optional distribution."""
 
-    def __init__(self, oracle: Oracle | None = None, *, fail: BaseException | None = None, delay_s: float = 0.0,
-                 with_distribution: bool = False, cost_usd: float = 0.0, info: ModelInfo | None = None) -> None:
+    def __init__(
+        self,
+        oracle: Oracle | None = None,
+        *,
+        fail: BaseException | None = None,
+        delay_s: float = 0.0,
+        with_distribution: bool = False,
+        cost_usd: float = 0.0,
+        info: ModelInfo | None = None,
+    ) -> None:
         self.oracle = oracle
         self.fail = fail
         self.delay_s = delay_s
@@ -160,7 +188,11 @@ class FakeTeacher:
 Generator = Callable[[State, str, Mapping[str, str]], Any]
 
 GENERATIVE_MALFORMED_MODES: tuple[str, ...] = (
-    "not-an-answer", "invalid-output", "nan-confidence", "confidence-above-one", "none-output",
+    "not-an-answer",
+    "invalid-output",
+    "nan-confidence",
+    "confidence-above-one",
+    "none-output",
 )
 
 
@@ -172,9 +204,17 @@ class FakeGenerativeModel:
     exactly as ``FakeDecisionModel`` does.
     """
 
-    def __init__(self, generate_fn: Generator | None = None, confidence: float = 0.9, *,
-                 fail: BaseException | None = None, delay_s: float = 0.0, malformed: str | None = None,
-                 cost_usd: float = 0.0, info: ModelInfo | None = None) -> None:
+    def __init__(
+        self,
+        generate_fn: Generator | None = None,
+        confidence: float = 0.9,
+        *,
+        fail: BaseException | None = None,
+        delay_s: float = 0.0,
+        malformed: str | None = None,
+        cost_usd: float = 0.0,
+        info: ModelInfo | None = None,
+    ) -> None:
         if malformed is not None and malformed not in GENERATIVE_MALFORMED_MODES:
             raise ValueError(f"malformed must be one of {GENERATIVE_MALFORMED_MODES}")
         self.generate_fn = generate_fn
@@ -202,7 +242,9 @@ class FakeGenerativeModel:
             return GenerativeAnswer({"smuggled": 1}, self.confidence)
         if self.malformed == "none-output":
             return GenerativeAnswer(None, self.confidence)
-        output = self.generate_fn(state, instructions, output_schema) if self.generate_fn else {k: "" for k in output_schema}
+        output = (
+            self.generate_fn(state, instructions, output_schema) if self.generate_fn else {k: "" for k in output_schema}
+        )
         if self.malformed == "nan-confidence":
             return GenerativeAnswer(output, float("nan"))
         if self.malformed == "confidence-above-one":
@@ -266,9 +308,17 @@ class FakeTrainer:
     def train(self, examples: Sequence[DecisionExample], base: str | None = None) -> ModelArtifact:
         self.trained_on.append(len(examples))
         capability = examples[0].capability if examples else "unknown.unknown"
-        return ModelArtifact(capability, self.model, str(len(self.trained_on)), self.provider,
-                             base or self.model, "fake", "memory://fake", {"examples": float(len(examples))},
-                             utc_now_iso())
+        return ModelArtifact(
+            capability,
+            self.model,
+            str(len(self.trained_on)),
+            self.provider,
+            base or self.model,
+            "fake",
+            "memory://fake",
+            {"examples": float(len(examples))},
+            utc_now_iso(),
+        )
 
 
 class FakeTraceSink:
@@ -322,6 +372,10 @@ class FakeRegistry:
         self._stages[(capability, version)] = stage
 
     def manifest(self, capability: str) -> dict[str, Any]:
-        return {"capability": capability,
-                "versions": [{**a.to_dict(), "stage": self._stages.get((capability, a.version), "candidate")}
-                             for a in self._artifacts.get(capability, [])]}
+        return {
+            "capability": capability,
+            "versions": [
+                {**a.to_dict(), "stage": self._stages.get((capability, a.version), "candidate")}
+                for a in self._artifacts.get(capability, [])
+            ],
+        }

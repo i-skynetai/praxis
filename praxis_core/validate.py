@@ -5,12 +5,18 @@ This is the validator the original seam shipped with, lifted behind the
 later without the router knowing. A host's schema crosses this boundary as a
 description, never as a host type.
 """
+
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 _TYPES: dict[str, type | tuple[type, ...]] = {
-    "str": str, "int": int, "float": (int, float), "bool": bool, "list": list, "dict": dict,
+    "str": str,
+    "int": int,
+    "float": (int, float),
+    "bool": bool,
+    "list": list,
+    "dict": dict,
 }
 
 

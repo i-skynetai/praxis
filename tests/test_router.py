@@ -1,10 +1,11 @@
 """Phase 1 exit gate, router half: a System-1 error, timeout or malformed answer never
 fails the call; shadow records both answers; the trace path never raises into the caller."""
+
 from __future__ import annotations
 
 import random
 import unittest
-from typing import Mapping
+from collections.abc import Mapping
 
 from praxis_core.contracts import (
     Budget,
@@ -17,13 +18,15 @@ from praxis_core.contracts import (
     TeacherAnswer,
     TraceEvent,
 )
-from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
 from praxis_core.providers.fake import MALFORMED_MODES, FakeCalibrator, FakeDecisionModel, FakeTeacher, FakeTraceSink
+from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
 from tests.helpers import TicketGenerator, oracle, triage_capability
 
 CAP = triage_capability()
-TICKET = {"subject": "invoice charged twice",
-          "body": "hi, why was I charged twice on the invoice. we need this today. we might switch providers."}
+TICKET = {
+    "subject": "invoice charged twice",
+    "body": "hi, why was I charged twice on the invoice. we need this today. we might switch providers.",
+}
 EXPECTED = {"department": "billing", "urgency": 2, "churn_risk": True}
 
 
@@ -34,8 +37,16 @@ def oracle_key(state: State, name: str, question: Question) -> str:
 def make(system1=None, *, policy=None, sink=None, calibrator=None, teacher=None, rng=None, on_trace_error=None):
     sink = sink if sink is not None else FakeTraceSink()
     teacher = teacher or FakeTeacher(oracle)
-    router = DecisionRouter(CAP, teacher, system1, calibrator, sink, policy or RoutingPolicy(threshold=0.5),
-                            rng=rng, on_trace_error=on_trace_error)
+    router = DecisionRouter(
+        CAP,
+        teacher,
+        system1,
+        calibrator,
+        sink,
+        policy or RoutingPolicy(threshold=0.5),
+        rng=rng,
+        on_trace_error=on_trace_error,
+    )
     return router, sink, teacher
 
 
@@ -64,7 +75,9 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
         self.assertEqual(router.stats.abstain_reasons["error"], 3)
 
     def test_a_system1_timeout_is_an_abstention_with_a_reason(self):
-        router, sink, _ = make(FakeDecisionModel(delay_s=0.3), policy=RoutingPolicy(threshold=0.5, system1_timeout_ms=40))
+        router, sink, _ = make(
+            FakeDecisionModel(delay_s=0.3), policy=RoutingPolicy(threshold=0.5, system1_timeout_ms=40)
+        )
         self.assert_all_from_teacher(router.decide_state(TICKET), sink, "timeout:")
         self.assertLess(sink.traces[-1].system1_latency_ms or 0.0, 250.0)
 
@@ -77,7 +90,8 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
     def test_a_misbehaving_calibrator_is_an_abstention_too(self):
         class BadCalibrator(FakeCalibrator):
             def apply(self, question, distribution):
-                return {k: 0.7 for k in distribution}     # sums to 1.4 or 2.8: never a distribution
+                return {k: 0.7 for k in distribution}  # sums to 1.4 or 2.8: never a distribution
+
         router, sink, _ = make(FakeDecisionModel(peak=0.97), calibrator=BadCalibrator())
         self.assert_all_from_teacher(router.decide_state(TICKET), sink, "calibrator:")
 
@@ -86,9 +100,13 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
         self.assert_all_from_teacher(router.decide_state(TICKET), sink, "no system1")
 
     def test_a_hundred_hostile_calls_are_all_served_by_system2(self):
-        hostile = [FakeDecisionModel(fail=ValueError("x")), FakeDecisionModel(malformed="nan"),
-                   FakeDecisionModel(malformed="unknown-key"), FakeDecisionModel(delay_s=0.2),
-                   FakeDecisionModel(malformed="not-a-mapping")]
+        hostile = [
+            FakeDecisionModel(fail=ValueError("x")),
+            FakeDecisionModel(malformed="nan"),
+            FakeDecisionModel(malformed="unknown-key"),
+            FakeDecisionModel(delay_s=0.2),
+            FakeDecisionModel(malformed="not-a-mapping"),
+        ]
         sink = FakeTraceSink()
         for i in range(100):
             router, _, _ = make(hostile[i % len(hostile)], sink=sink, policy=RoutingPolicy(0.5, system1_timeout_ms=20))
@@ -100,7 +118,7 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
 
 class ShadowRecordsBothAnswers(unittest.TestCase):
     def test_the_teacher_serves_and_system1_is_recorded_beside_it(self):
-        wrong = FakeDecisionModel(pick=lambda s, n, q: q.keys()[-1], peak=0.9)   # always the last key
+        wrong = FakeDecisionModel(pick=lambda s, n, q: q.keys()[-1], peak=0.9)  # always the last key
         router, sink, teacher = make(wrong, policy=RoutingPolicy(0.5, stage="shadow"))
         results = router.decide_state(TICKET)
         for name, r in results.items():
@@ -150,8 +168,9 @@ class TheTracePathNeverRaises(unittest.TestCase):
             seen.append(exc)
             raise RuntimeError("the hook is broken as well")
 
-        router, _, _ = make(FakeDecisionModel(peak=0.97), sink=FakeTraceSink(fail=OSError("disk full")),
-                            on_trace_error=hook)
+        router, _, _ = make(
+            FakeDecisionModel(peak=0.97), sink=FakeTraceSink(fail=OSError("disk full")), on_trace_error=hook
+        )
         router.decide_state(TICKET)
         self.assertEqual(len(seen), 1)
         self.assertIsInstance(seen[0], OSError)
@@ -209,10 +228,16 @@ class ServeAndAbstain(unittest.TestCase):
 
     def test_require_calibrated_refuses_an_uncalibrated_question(self):
         model = FakeDecisionModel(pick=oracle_key, peak=0.97)
-        router, _, _ = make(model, calibrator=FakeCalibrator(fitted=False), policy=RoutingPolicy(0.5, require_calibrated=True))
+        router, _, _ = make(
+            model, calibrator=FakeCalibrator(fitted=False), policy=RoutingPolicy(0.5, require_calibrated=True)
+        )
         results = router.decide_state(TICKET)
-        self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("uncalibrated") for r in results.values()))
-        router, _, _ = make(model, calibrator=FakeCalibrator(fitted=True), policy=RoutingPolicy(0.5, require_calibrated=True))
+        self.assertTrue(
+            all(r.answered_by == "system2" and r.reason.startswith("uncalibrated") for r in results.values())
+        )
+        router, _, _ = make(
+            model, calibrator=FakeCalibrator(fitted=True), policy=RoutingPolicy(0.5, require_calibrated=True)
+        )
         self.assertTrue(all(r.answered_by == "system1" for r in router.decide_state(TICKET).values()))
 
     def test_score_results_carry_an_expected_value(self):
@@ -222,8 +247,10 @@ class ServeAndAbstain(unittest.TestCase):
         self.assertAlmostEqual(r.expected_value or 0.0, 2 * 0.97 + (0 + 1 + 3) * 0.01, places=9)
 
     def test_rank_is_derived_from_the_choice_distribution(self):
-        cap = Capability("support.route", questions={"order": Question.rank("Order the teams by fit.",
-                                                                            {"a": "A", "b": "B", "c": "C"})})
+        cap = Capability(
+            "support.route",
+            questions={"order": Question.rank("Order the teams by fit.", {"a": "A", "b": "B", "c": "C"})},
+        )
         model = FakeDecisionModel(pick=lambda s, n, q: "b", peak=0.8)
         seen: list[Question] = []
 
@@ -255,21 +282,26 @@ class ServeAndAbstain(unittest.TestCase):
 
 class CanaryShare(unittest.TestCase):
     def test_share_zero_sends_every_call_to_the_teacher(self):
-        router, _, teacher = make(FakeDecisionModel(pick=oracle_key, peak=0.97),
-                                  policy=RoutingPolicy(0.5, stage="canary", canary_share=0.0))
+        router, _, teacher = make(
+            FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5, stage="canary", canary_share=0.0)
+        )
         results = router.decide_state(TICKET)
         self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("canary") for r in results.values()))
         self.assertEqual(teacher.calls, 1)
 
     def test_share_one_behaves_like_serve(self):
-        router, _, teacher = make(FakeDecisionModel(pick=oracle_key, peak=0.97),
-                                  policy=RoutingPolicy(0.5, stage="canary", canary_share=1.0))
+        router, _, teacher = make(
+            FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5, stage="canary", canary_share=1.0)
+        )
         self.assertTrue(all(r.answered_by == "system1" for r in router.decide_state(TICKET).values()))
         self.assertEqual(teacher.calls, 0)
 
     def test_a_half_share_splits_the_calls(self):
-        router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97),
-                            policy=RoutingPolicy(0.5, stage="canary", canary_share=0.5), rng=random.Random(1))
+        router, _, _ = make(
+            FakeDecisionModel(pick=oracle_key, peak=0.97),
+            policy=RoutingPolicy(0.5, stage="canary", canary_share=0.5),
+            rng=random.Random(1),
+        )
         for _ in range(40):
             router.decide_state(TICKET)
         stats = router.stats.as_dict()
@@ -294,6 +326,7 @@ class TheTeacherIsTheOnlyThingThatCanFail(unittest.TestCase):
     def test_a_teacher_answer_outside_the_declared_set_is_a_teacher_error(self):
         def liar(state, name, question):
             return "nonsense" if name == "department" else oracle(state, name, question)
+
         router, sink, _ = make(None, teacher=FakeTeacher(liar))
         with self.assertRaises(TeacherError):
             router.decide_state(TICKET)
@@ -304,7 +337,11 @@ class TheTeacherIsTheOnlyThingThatCanFail(unittest.TestCase):
             info = ModelInfo("fake", "skewed")
 
             def answer(self, state, questions):
-                return {n: TeacherAnswer(oracle(state, n, q), {k: 0.7 for k in q.keys()}) for n, q in questions.items()}
+                return {
+                    n: TeacherAnswer(oracle(state, n, q), {k: 0.7 for k in q.keys()})  # noqa: SIM118 - a method
+                    for n, q in questions.items()
+                }
+
         router, _, _ = make(None, teacher=Skewed())
         with self.assertRaises(TeacherError):
             router.decide_state(TICKET)
@@ -343,10 +380,24 @@ class StatsHaveAStableShape(unittest.TestCase):
     def test_as_dict_keys(self):
         router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97))
         router.decide_state(TICKET)
-        self.assertEqual(set(router.stats.as_dict()), {
-            "calls", "questions", "system1_questions", "system2_questions", "system1_share", "abstain_reasons",
-            "shadow_compared", "shadow_agreed", "shadow_agreement", "teacher_failures", "trace_failures",
-            "observed", "observe_failures"})
+        self.assertEqual(
+            set(router.stats.as_dict()),
+            {
+                "calls",
+                "questions",
+                "system1_questions",
+                "system2_questions",
+                "system1_share",
+                "abstain_reasons",
+                "shadow_compared",
+                "shadow_agreed",
+                "shadow_agreement",
+                "teacher_failures",
+                "trace_failures",
+                "observed",
+                "observe_failures",
+            },
+        )
 
     def test_policies_are_validated(self):
         with self.assertRaises(ValueError):
@@ -433,6 +484,7 @@ class ObserveModeNeverTouchesTheRequestPath(unittest.TestCase):
     def test_observed_traces_become_examples_and_fit_the_student(self):
         from praxis_core.baseline import NearestNeighbourDecisionModel
         from praxis_core.dataset import examples_from_traces
+
         router, sink, teacher = make(None)
         for ticket in TicketGenerator(3).tickets(20):
             answers = {n: a.answer for n, a in teacher.answer(ticket, CAP.questions).items()}

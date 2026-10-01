@@ -55,6 +55,22 @@ Plus the standing checks: tests green on Python 3.11 to 3.14, `mypy --strict` cl
 standard library only in `praxis/core`, no provider name outside `praxis_core/providers/`,
 the demo under one second with the fakes.
 
+## 2b. The showcase bar (applies to every release, from 0.3.0 on)
+
+Added 2026-10-01. Whatever is released must be a complete, working, testable project
+that a stranger can run, read and judge in a few minutes. For every release:
+
+| Check | How it is met |
+|---|---|
+| Runs in sixty seconds from a clone | `python -m praxis_core demo`; no install, no key, no network |
+| One command checks everything | `make check` = ruff, mypy --strict, the suite; CI runs the same |
+| The front page reads in two minutes | README: what it does, the demo, three steps to use it, where the rest is |
+| Every guarantee is a test, and the README names it | the guarantees table |
+| Every design decision has a dated entry | [docs/decisions.md](decisions.md) |
+| Every planned feature is a claimable row | [ROADMAP.md](../ROADMAP.md), with good-first-issue rows for contributors |
+| No dead links, no stale numbers | the test count and the demo output in the README come from the release run |
+| Plain words | a technical term is explained the first time it is used |
+
 ## 3. In and out
 
 | In v1.0 | Out (roadmap, "After 1.0") | Why the line is here |
@@ -81,7 +97,7 @@ rows to Done. Sizes assume one developer; weeks are estimates, not promises.
 | M2 | 0.4.0 | Trust the data, trust the eval | PX-040 gate for decision traces · PX-041 dataset builder · PX-030 to PX-034 scorecard and `praxis eval` | decontamination report clean and tested; two builds identical; two evals identical; teacher-vs-teacher shows no delta | ~2 weeks |
 | M3 | 0.5.0 | Registry, promotion, status | PX-044 registry, promote, rollback · PX-110 `praxis status` · PX-026 doctor · PX-027 conformance · PX-045 remaining CLI | promotion refused with the failing gate named; rollback is one flag; `status` verdict matches the gates on fixtures; conformance green on every installed adapter | ~1.5 weeks |
 | M4 | 0.6.0 | Students and training rungs | PX-020 laya-mlx · PX-042 temperature refit trainer · PX-111 exemplar trainer · PX-112 `praxis suggest` · PX-046 outcome and feedback labels | on the demo, a fitted student's scorecard improves across two dataset versions; `suggest` entries are each verified against a README with a date | ~2 weeks |
-| M5 | 1.0.0 | Release | PX-120 host integration guide · PX-121 CLI reference and README · PX-122 one-command definition-of-done test · PX-090 publish | the §2 table, every row a passing test; `pip install` from PyPI runs the demo | ~1 week |
+| M5 | 1.0.0 | Release | PX-120 host integration guide · PX-121 CLI reference and README · PX-122 one-command definition-of-done test · PX-123 first-run audit · PX-090 publish | the §2 and §2b tables, every row a passing test or a checked box; `pip install` from PyPI runs the demo | ~1 week |
 
 About nine weeks of one developer's time, with the usual caveat that the provider APIs
 are weeks old and may move under PX-020.

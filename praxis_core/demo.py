@@ -18,22 +18,23 @@ Four stages, in the order the plan says to trust the loop before the model:
 The last line reports how many System-1 answers the teacher would have disagreed with,
 because that is the number this project exists to keep small.
 """
+
 from __future__ import annotations
 
 import random
-import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping
-
 import re
+import time
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from typing import Any
 
 from praxis_core.baseline import NearestNeighbourDecisionModel, NearestNeighbourGenerativeModel
 from praxis_core.calibrate import PlattCalibrator, TemperatureCalibrator
 from praxis_core.contracts import Answer, Capability, ModelInfo, Question, State
 from praxis_core.dataset import examples_from_traces, generative_examples_from_traces
 from praxis_core.ports import TraceSink
-from praxis_core.router import DecisionRouter, GenerativeRouter, RoutingPolicy
 from praxis_core.providers.fake import FakeGenerativeModel, FakeTeacher, FakeTraceSink
+from praxis_core.router import DecisionRouter, GenerativeRouter, RoutingPolicy
 
 DEPARTMENTS = {
     "billing": "Invoices, charges, refunds and payment methods.",
@@ -58,7 +59,8 @@ def support_triage() -> Capability:
             "department": Question.choice("Which team should handle this ticket?", DEPARTMENTS),
             "urgency": Question.score("How urgent is this ticket?", URGENCY),
             "churn_risk": Question.boolean("The customer is at risk of cancelling."),
-        })
+        },
+    )
 
 
 PRODUCTS = ("Nimbus router", "Atlas backup", "Orbit subscription", "Pulse monitor", "Delta sync", "Keystone vault")
@@ -67,11 +69,15 @@ PRODUCTS = ("Nimbus router", "Atlas backup", "Orbit subscription", "Pulse monito
 def support_extract() -> Capability:
     """The generative sibling: three fields out of the same tickets."""
     return Capability(
-        name="support.extract", kind="generative",
+        name="support.extract",
+        kind="generative",
         description="Pull the product, the issue type and the order id out of an inbound support ticket.",
-        instructions=("Extract the product named in the ticket, the issue type, and the order id. "
-                      "Use an empty string for anything the ticket does not say."),
-        output_schema={"product": "str", "issue": "str", "order_id": "str"})
+        instructions=(
+            "Extract the product named in the ticket, the issue type, and the order id. "
+            "Use an empty string for anything the ticket does not say."
+        ),
+        output_schema={"product": "str", "issue": "str", "order_id": "str"},
+    )
 
 
 # ------------------------------------------------------------------ the teacher
@@ -125,32 +131,64 @@ def rule_teacher(state: State, name: str, question: Question) -> Answer:
 # ---------------------------------------------------------------- the traffic
 
 _DEPARTMENT_PHRASES = {
-    "billing": ("my invoice shows a charge I do not recognise", "the payment failed but my card was charged",
-                "I need a refund for last month", "why was I charged twice on the invoice",
-                "the payment page keeps rejecting my card", "please resend the invoice for March"),
-    "technical": ("the login page throws an error", "the app crashes when I export",
-                  "your api returns a 500 error", "we have an outage on the dashboard",
-                  "the integration fails with a timeout error", "login keeps failing with an unknown error"),
-    "account": ("I cannot reset my password", "please change the email on my profile",
-                "I need access for a new team member", "my profile shows the wrong name",
-                "the password reset email never arrives", "remove access for a former employee"),
-    "sales": ("what is the pricing for 50 seats", "we want to upgrade to the enterprise plan",
-              "can you send a quote for annual billing", "which plan includes audit logs",
-              "we are comparing plans before we upgrade", "I need a quote for the team plan"),
+    "billing": (
+        "my invoice shows a charge I do not recognise",
+        "the payment failed but my card was charged",
+        "I need a refund for last month",
+        "why was I charged twice on the invoice",
+        "the payment page keeps rejecting my card",
+        "please resend the invoice for March",
+    ),
+    "technical": (
+        "the login page throws an error",
+        "the app crashes when I export",
+        "your api returns a 500 error",
+        "we have an outage on the dashboard",
+        "the integration fails with a timeout error",
+        "login keeps failing with an unknown error",
+    ),
+    "account": (
+        "I cannot reset my password",
+        "please change the email on my profile",
+        "I need access for a new team member",
+        "my profile shows the wrong name",
+        "the password reset email never arrives",
+        "remove access for a former employee",
+    ),
+    "sales": (
+        "what is the pricing for 50 seats",
+        "we want to upgrade to the enterprise plan",
+        "can you send a quote for annual billing",
+        "which plan includes audit logs",
+        "we are comparing plans before we upgrade",
+        "I need a quote for the team plan",
+    ),
 }
 _ISSUE_OF_PHRASE = {
-    "my invoice shows a charge i do not recognise": "unknown_charge", "the payment failed but my card was charged": "payment_failed",
-    "i need a refund for last month": "refund", "why was i charged twice on the invoice": "double_charge",
-    "the payment page keeps rejecting my card": "payment_failed", "please resend the invoice for march": "invoice_copy",
-    "the login page throws an error": "login_error", "the app crashes when i export": "crash",
-    "your api returns a 500 error": "api_error", "we have an outage on the dashboard": "outage",
-    "the integration fails with a timeout error": "integration_timeout", "login keeps failing with an unknown error": "login_error",
-    "i cannot reset my password": "password_reset", "please change the email on my profile": "profile_change",
-    "i need access for a new team member": "access_request", "my profile shows the wrong name": "profile_change",
-    "the password reset email never arrives": "password_reset", "remove access for a former employee": "access_removal",
-    "what is the pricing for 50 seats": "pricing", "we want to upgrade to the enterprise plan": "upgrade",
-    "can you send a quote for annual billing": "quote", "which plan includes audit logs": "plan_question",
-    "we are comparing plans before we upgrade": "upgrade", "i need a quote for the team plan": "quote",
+    "my invoice shows a charge i do not recognise": "unknown_charge",
+    "the payment failed but my card was charged": "payment_failed",
+    "i need a refund for last month": "refund",
+    "why was i charged twice on the invoice": "double_charge",
+    "the payment page keeps rejecting my card": "payment_failed",
+    "please resend the invoice for march": "invoice_copy",
+    "the login page throws an error": "login_error",
+    "the app crashes when i export": "crash",
+    "your api returns a 500 error": "api_error",
+    "we have an outage on the dashboard": "outage",
+    "the integration fails with a timeout error": "integration_timeout",
+    "login keeps failing with an unknown error": "login_error",
+    "i cannot reset my password": "password_reset",
+    "please change the email on my profile": "profile_change",
+    "i need access for a new team member": "access_request",
+    "my profile shows the wrong name": "profile_change",
+    "the password reset email never arrives": "password_reset",
+    "remove access for a former employee": "access_removal",
+    "what is the pricing for 50 seats": "pricing",
+    "we want to upgrade to the enterprise plan": "upgrade",
+    "can you send a quote for annual billing": "quote",
+    "which plan includes audit logs": "plan_question",
+    "we are comparing plans before we upgrade": "upgrade",
+    "i need a quote for the team plan": "quote",
 }
 _URGENCY_PHRASES = (
     ("no rush at all, whenever you get to it", "low priority, just letting you know"),
@@ -179,7 +217,11 @@ class TicketGenerator:
         churn = rng.choice(_CHURN_PHRASES[0] if rng.random() < 0.3 else _CHURN_PHRASES[1])
         subject = " ".join(problem.split()[:4])
         product = f" for my {rng.choice(PRODUCTS)}" if rng.random() < 0.7 else ""
-        order = f" (order #{rng.choice('ABCDEFGH')}{rng.choice('JKLMNPQR')}{rng.randrange(1000, 9999)})" if rng.random() < 0.6 else ""
+        order = (
+            f" (order #{rng.choice('ABCDEFGH')}{rng.choice('JKLMNPQR')}{rng.randrange(1000, 9999)})"
+            if rng.random() < 0.6
+            else ""
+        )
         body = f"{rng.choice(_GREETINGS)}, {problem}{product}{order}. {urgency}. {churn}."
         return {"subject": subject, "body": body}
 
@@ -188,6 +230,7 @@ class TicketGenerator:
 
 
 # ------------------------------------------------------------------- the loop
+
 
 @dataclass
 class StageReport:
@@ -200,10 +243,15 @@ class StageReport:
     elapsed_ms: float
 
     def as_dict(self) -> dict[str, Any]:
-        return {"stage": self.stage, "calls": self.calls, "questions": self.questions,
-                "system1_share": round(self.system1_share, 4), "abstain_share": round(self.abstain_share, 4),
-                "agreement": None if self.agreement is None else round(self.agreement, 4),
-                "elapsed_ms": round(self.elapsed_ms, 1)}
+        return {
+            "stage": self.stage,
+            "calls": self.calls,
+            "questions": self.questions,
+            "system1_share": round(self.system1_share, 4),
+            "abstain_share": round(self.abstain_share, 4),
+            "agreement": None if self.agreement is None else round(self.agreement, 4),
+            "elapsed_ms": round(self.elapsed_ms, 1),
+        }
 
 
 @dataclass
@@ -225,18 +273,30 @@ class DemoSummary:
     extract_verdict: str = ""
 
     def as_dict(self) -> dict[str, Any]:
-        return {"stages": [s.as_dict() for s in self.stages], "temperatures": self.temperatures,
-                "examples": self.examples, "served_by_system1": self.served_by_system1,
-                "confident_wrong": self.confident_wrong, "trace_count": self.trace_count, "verdict": self.verdict,
-                "extract": {"stages": [s.as_dict() for s in self.extract_stages], "platt": self.extract_platt,
-                            "verdict": self.extract_verdict,
-                            "examples": self.extract_examples, "served_by_system1": self.extract_served_by_system1,
-                            "confident_wrong": self.extract_confident_wrong, "trace_count": self.extract_trace_count},
-                "elapsed_ms": round(self.elapsed_ms, 1)}
+        return {
+            "stages": [s.as_dict() for s in self.stages],
+            "temperatures": self.temperatures,
+            "examples": self.examples,
+            "served_by_system1": self.served_by_system1,
+            "confident_wrong": self.confident_wrong,
+            "trace_count": self.trace_count,
+            "verdict": self.verdict,
+            "extract": {
+                "stages": [s.as_dict() for s in self.extract_stages],
+                "platt": self.extract_platt,
+                "verdict": self.extract_verdict,
+                "examples": self.extract_examples,
+                "served_by_system1": self.extract_served_by_system1,
+                "confident_wrong": self.extract_confident_wrong,
+                "trace_count": self.extract_trace_count,
+            },
+            "elapsed_ms": round(self.elapsed_ms, 1),
+        }
 
 
-def readiness(agreement: float | None, compared: int, calibrated: bool, min_agreement: float = 0.5,
-              min_compared: int = 30) -> str:
+def readiness(
+    agreement: float | None, compared: int, calibrated: bool, min_agreement: float = 0.5, min_compared: int = 30
+) -> str:
     """A one-line verdict after shadow: the minimal form of what ``praxis status`` (PX-110)
     will say against the v1.0 gates. Nothing moves to canary without it."""
     missing = []
@@ -251,12 +311,13 @@ def readiness(agreement: float | None, compared: int, calibrated: bool, min_agre
     return f"ready for canary: agreement {agreement:.2f} on {compared}, calibrator fitted"
 
 
-def _run_stage(router: DecisionRouter, generator: TicketGenerator, n: int, label: str,
-               observe_with: FakeTeacher | None = None) -> StageReport:
+def _run_stage(
+    router: DecisionRouter, generator: TicketGenerator, n: int, label: str, observe_with: FakeTeacher | None = None
+) -> StageReport:
     before = router.stats.as_dict()
     started = time.perf_counter()
     for ticket in generator.tickets(n):
-        if observe_with is not None:                     # the app makes its own call, then reports it
+        if observe_with is not None:  # the app makes its own call, then reports it
             t0 = time.perf_counter()
             answers = {name: a.answer for name, a in observe_with.answer(ticket, router.capability.questions).items()}
             router.observe_state(ticket, answers, observe_with.info, (time.perf_counter() - t0) * 1000.0)
@@ -269,9 +330,15 @@ def _run_stage(router: DecisionRouter, generator: TicketGenerator, n: int, label
     abstained = sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())
     compared = after["shadow_compared"] - before["shadow_compared"]
     agreed = after["shadow_agreed"] - before["shadow_agreed"]
-    return StageReport(label, n, questions, system1 / questions if questions else 0.0,
-                       abstained / questions if questions else 0.0,
-                       agreed / compared if compared else None, elapsed)
+    return StageReport(
+        label,
+        n,
+        questions,
+        system1 / questions if questions else 0.0,
+        abstained / questions if questions else 0.0,
+        agreed / compared if compared else None,
+        elapsed,
+    )
 
 
 @dataclass
@@ -279,13 +346,19 @@ class Providers:
     """Real adapters to stand in for the fakes, per role. ``None`` keeps the fake. With a
     real model each call takes seconds, so pass a small ``--tickets``."""
 
-    teacher: Any = None          # Teacher for triage, and GenerativeModel for extract
-    system1: Any = None          # DecisionModel for triage
-    student: Any = None          # GenerativeModel for extract
+    teacher: Any = None  # Teacher for triage, and GenerativeModel for extract
+    system1: Any = None  # DecisionModel for triage
+    student: Any = None  # GenerativeModel for extract
 
 
-def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: TraceSink | None = None,
-             out: Callable[[str], None] | None = print, providers: Providers | None = None) -> DemoSummary:
+def run_demo(
+    tickets: int = 60,
+    threshold: float = 0.5,
+    seed: int = 7,
+    sink: TraceSink | None = None,
+    out: Callable[[str], None] | None = print,
+    providers: Providers | None = None,
+) -> DemoSummary:
     say = out or (lambda _line: None)
     providers = providers or Providers()
     started = time.perf_counter()
@@ -295,36 +368,47 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
     student: Any = providers.system1 or NearestNeighbourDecisionModel()
     calibrator = TemperatureCalibrator(min_examples=10)
     sink = sink if sink is not None else FakeTraceSink()
-    router = DecisionRouter(capability, teacher, student, calibrator, sink,
-                            RoutingPolicy(threshold=threshold, stage="shadow", canary_share=0.5),
-                            rng=random.Random(seed), source="synthetic")
+    router = DecisionRouter(
+        capability,
+        teacher,
+        student,
+        calibrator,
+        sink,
+        RoutingPolicy(threshold=threshold, stage="shadow", canary_share=0.5),
+        rng=random.Random(seed),
+        source="synthetic",
+    )
     summary = DemoSummary()
 
-    say(f"praxis demo: {capability.name}, {len(capability.questions)} questions, "
-        f"{teacher.info.model} teacher, {student.info.model} student, threshold {threshold}")
+    say(
+        f"praxis demo: {capability.name}, {len(capability.questions)} questions, "
+        f"{teacher.info.model} teacher, {student.info.model} student, threshold {threshold}"
+    )
     say("")
     say(f"{'stage':<14}{'calls':>6}{'questions':>11}{'system1':>9}{'abstain':>9}{'agree':>8}{'ms':>7}")
 
     def show(report: StageReport) -> None:
         summary.stages.append(report)
         agree = "-" if report.agreement is None else f"{report.agreement:.2f}"
-        say(f"{report.stage:<14}{report.calls:>6}{report.questions:>11}{report.system1_share:>8.0%} "
-            f"{report.abstain_share:>8.0%}{agree:>8}{report.elapsed_ms:>7.1f}")
+        say(
+            f"{report.stage:<14}{report.calls:>6}{report.questions:>11}{report.system1_share:>8.0%} "
+            f"{report.abstain_share:>8.0%}{agree:>8}{report.elapsed_ms:>7.1f}"
+        )
 
-    show(_run_stage(router, generator, tickets, "observe", observe_with=teacher))   # 1. the app's own answers
+    show(_run_stage(router, generator, tickets, "observe", observe_with=teacher))  # 1. the app's own answers
 
     examples, report = examples_from_traces(sink.read(capability.name), capability)
-    summary.examples = student.fit(examples) if hasattr(student, "fit") else 0   # 2. labels → student
-    warm = _run_stage(router, generator, tickets, "shadow-warm")          #    both answers side by side
+    summary.examples = student.fit(examples) if hasattr(student, "fit") else 0  # 2. labels → student
+    warm = _run_stage(router, generator, tickets, "shadow-warm")  #    both answers side by side
     show(warm)
     summary.temperatures = dict(calibrator.fit(list(sink.read(capability.name))))  # → calibrator
     summary.verdict = readiness(warm.agreement, warm.questions, bool(summary.temperatures))
     say(f"verdict: {summary.verdict}")
 
-    router.set_stage("canary")                                            # 3. half the calls may be served
+    router.set_stage("canary")  # 3. half the calls may be served
     show(_run_stage(router, generator, tickets, "canary-50%"))
 
-    router.set_stage("serve")                                             # 4. serve when confident
+    router.set_stage("serve")  # 4. serve when confident
     served_states: list[tuple[dict[str, str], str, Answer]] = []
     serve_started = time.perf_counter()
     before = router.stats.as_dict()
@@ -334,10 +418,19 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
                 served_states.append((ticket, name, result.answer))
     after = router.stats.as_dict()
     questions = after["questions"] - before["questions"]
-    show(StageReport("serve", tickets, questions,
-                     (after["system1_questions"] - before["system1_questions"]) / questions if questions else 0.0,
-                     (sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())) / questions
-                     if questions else 0.0, None, (time.perf_counter() - serve_started) * 1000.0))
+    show(
+        StageReport(
+            "serve",
+            tickets,
+            questions,
+            (after["system1_questions"] - before["system1_questions"]) / questions if questions else 0.0,
+            (sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())) / questions
+            if questions
+            else 0.0,
+            None,
+            (time.perf_counter() - serve_started) * 1000.0,
+        )
+    )
 
     # The number to watch: served by System-1, and the teacher would have said otherwise.
     for ticket, name, answer in served_states:
@@ -348,38 +441,63 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
     say("")
     temps = "  ".join(f"{k} T={v:.2f}" for k, v in summary.temperatures.items()) or "none fitted"
     say(f"calibrator: {temps}")
-    say(f"labels: {report['examples']} System-2 answers from {report['traces']} traces -> "
-        f"{summary.examples} examples -> student fitted")
-    say(f"served by System-1 in the serve stage: {summary.served_by_system1}; the teacher would have "
-        f"disagreed on {summary.confident_wrong} (confident-wrong)")
+    say(
+        f"labels: {report['examples']} System-2 answers from {report['traces']} traces -> "
+        f"{summary.examples} examples -> student fitted"
+    )
+    say(
+        f"served by System-1 in the serve stage: {summary.served_by_system1}; the teacher would have "
+        f"disagreed on {summary.confident_wrong} (confident-wrong)"
+    )
 
     _run_extract(summary, tickets, threshold, seed, sink, say, providers)
 
     summary.trace_count = sum(1 for _ in sink.read(capability.name))
     summary.elapsed_ms = (time.perf_counter() - started) * 1000.0
     say("")
-    say(f"{summary.trace_count + summary.extract_trace_count} traces recorded; the trace path raised into the "
-        f"caller {router.stats.trace_failures} times")
-    say(f"loop closed in {summary.elapsed_ms:.0f} ms: capture -> label -> fit -> calibrate -> canary -> serve, "
-        f"for both kinds. The teacher stays.")
+    say(
+        f"{summary.trace_count + summary.extract_trace_count} traces recorded; the trace path raised into the "
+        f"caller {router.stats.trace_failures} times"
+    )
+    say(
+        f"loop closed in {summary.elapsed_ms:.0f} ms: capture -> label -> fit -> calibrate -> canary -> serve, "
+        f"for both kinds. The teacher stays."
+    )
     return summary
 
 
-def _run_extract(summary: DemoSummary, tickets: int, threshold: float, seed: int, sink: TraceSink,
-                 say: Callable[[str], None], providers: Providers) -> None:
+def _run_extract(
+    summary: DemoSummary,
+    tickets: int,
+    threshold: float,
+    seed: int,
+    sink: TraceSink,
+    say: Callable[[str], None],
+    providers: Providers,
+) -> None:
     """The same four stages for the generative capability, on the same kind of traffic."""
     capability = support_extract()
     generator = TicketGenerator(seed + 1)
-    teacher: Any = providers.teacher or FakeGenerativeModel(extract_rule_teacher,
-                                                            info=ModelInfo("fake", "fake-extract-teacher", "0"))
+    teacher: Any = providers.teacher or FakeGenerativeModel(
+        extract_rule_teacher, info=ModelInfo("fake", "fake-extract-teacher", "0")
+    )
     student: Any = providers.student or NearestNeighbourGenerativeModel()
     calibrator = PlattCalibrator(min_examples=10)
-    router = GenerativeRouter(capability, teacher, student, calibrator, sink,
-                              RoutingPolicy(threshold=threshold, stage="shadow", canary_share=0.5,
-                                            require_calibrated=True),
-                              rng=random.Random(seed), source="synthetic")
+    router = GenerativeRouter(
+        capability,
+        teacher,
+        student,
+        calibrator,
+        sink,
+        RoutingPolicy(threshold=threshold, stage="shadow", canary_share=0.5, require_calibrated=True),
+        rng=random.Random(seed),
+        source="synthetic",
+    )
     say("")
-    say(f"{capability.name}: 3 fields, {teacher.info.model} teacher, {student.info.model} student, threshold {threshold}")
+    say(
+        f"{capability.name}: 3 fields, {teacher.info.model} teacher, {student.info.model} student, "
+        f"threshold {threshold}"
+    )
     say("")
     say(f"{'stage':<14}{'calls':>6}{'questions':>11}{'system1':>9}{'abstain':>9}{'agree':>8}{'ms':>7}")
 
@@ -400,13 +518,21 @@ def _run_extract(summary: DemoSummary, tickets: int, threshold: float, seed: int
         n = after["questions"] - before["questions"]
         compared = after["shadow_compared"] - before["shadow_compared"]
         agreed = after["shadow_agreed"] - before["shadow_agreed"]
-        report = StageReport(label, tickets, n, (after["system1_questions"] - before["system1_questions"]) / n if n else 0.0,
-                             (sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())) / n if n else 0.0,
-                             agreed / compared if compared else None, (time.perf_counter() - started) * 1000.0)
+        report = StageReport(
+            label,
+            tickets,
+            n,
+            (after["system1_questions"] - before["system1_questions"]) / n if n else 0.0,
+            (sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())) / n if n else 0.0,
+            agreed / compared if compared else None,
+            (time.perf_counter() - started) * 1000.0,
+        )
         summary.extract_stages.append(report)
         agree = "-" if report.agreement is None else f"{report.agreement:.2f}"
-        say(f"{report.stage:<14}{report.calls:>6}{report.questions:>11}{report.system1_share:>8.0%} "
-            f"{report.abstain_share:>8.0%}{agree:>8}{report.elapsed_ms:>7.1f}")
+        say(
+            f"{report.stage:<14}{report.calls:>6}{report.questions:>11}{report.system1_share:>8.0%} "
+            f"{report.abstain_share:>8.0%}{agree:>8}{report.elapsed_ms:>7.1f}"
+        )
         for ticket, output in served:
             summary.extract_served_by_system1 += 1
             if teacher.generate(ticket, capability.instructions, capability.output_schema).output != output:
@@ -426,11 +552,15 @@ def _run_extract(summary: DemoSummary, tickets: int, threshold: float, seed: int
     stage("serve")
     summary.extract_trace_count = sum(1 for _ in sink.read(capability.name))
     say("")
-    platt = ("a={a:.2f} b={b:.2f}".format(**summary.extract_platt) if summary.extract_platt else "not fitted")
+    platt = "a={a:.2f} b={b:.2f}".format(**summary.extract_platt) if summary.extract_platt else "not fitted"
     say(f"calibrator: platt {platt}")
     say(f"labels: {report['examples']} System-2 outputs -> {summary.extract_examples} examples -> student fitted")
-    say(f"served by System-1 in the serve stage: {summary.extract_served_by_system1}; the teacher would have "
-        f"disagreed on {summary.extract_confident_wrong} (confident-wrong)")
+    say(
+        f"served by System-1 in the serve stage: {summary.extract_served_by_system1}; the teacher would have "
+        f"disagreed on {summary.extract_confident_wrong} (confident-wrong)"
+    )
     if not calibrator.is_fitted():
-        say("the policy requires a fitted calibrator, so nothing was served: a student that copies its nearest "
-            "neighbour cannot extract, and Praxis says so instead of serving it")
+        say(
+            "the policy requires a fitted calibrator, so nothing was served: a student that copies its nearest "
+            "neighbour cannot extract, and Praxis says so instead of serving it"
+        )

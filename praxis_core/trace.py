@@ -11,15 +11,18 @@ enqueues and returns; one daemon thread drains into the inner sink; a full queue
 and counts, never blocks; an inner failure is counted, never raised. ``flush()`` waits
 for the queue to empty, which tests and shutdown need and the request path never does.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import queue
 import sqlite3
 import threading
 import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 from .contracts import TraceEvent
 from .ports import TraceSink
@@ -89,8 +92,17 @@ class SqliteTraceSink:
             self._conn.execute(
                 "INSERT OR REPLACE INTO traces (trace_id, capability, created_at, stage, answered_by, abstain, "
                 "host_partition, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (trace.trace_id, trace.capability, trace.created_at, trace.stage, trace.answered_by,
-                 1 if trace.abstain else 0, trace.host_partition, trace.to_json()))
+                (
+                    trace.trace_id,
+                    trace.capability,
+                    trace.created_at,
+                    trace.stage,
+                    trace.answered_by,
+                    1 if trace.abstain else 0,
+                    trace.host_partition,
+                    trace.to_json(),
+                ),
+            )
             self._conn.commit()
 
     def read(self, capability: str | None = None) -> Iterator[TraceEvent]:
@@ -130,8 +142,9 @@ class SqliteTraceSink:
 class QueuedTraceSink:
     """A bounded queue and one daemon thread in front of any sink."""
 
-    def __init__(self, inner: TraceSink, maxsize: int = 10_000,
-                 on_error: Callable[[BaseException], None] | None = None) -> None:
+    def __init__(
+        self, inner: TraceSink, maxsize: int = 10_000, on_error: Callable[[BaseException], None] | None = None
+    ) -> None:
         if maxsize < 1:
             raise ValueError("maxsize must be at least 1")
         self.inner = inner
@@ -171,10 +184,8 @@ class QueuedTraceSink:
                     with self._lock:
                         self.errors += 1
                     if self.on_error is not None:
-                        try:
+                        with contextlib.suppress(BaseException):  # a hook that raises must not either
                             self.on_error(exc)
-                        except BaseException:  # noqa: BLE001
-                            pass
             finally:
                 self._queue.task_done()
 
@@ -194,8 +205,13 @@ class QueuedTraceSink:
 
     def stats(self) -> dict[str, Any]:
         with self._lock:
-            return {"recorded": self.recorded, "dropped": self.dropped, "errors": self.errors,
-                    "queued": self._queue.qsize(), "closed": self._closed}
+            return {
+                "recorded": self.recorded,
+                "dropped": self.dropped,
+                "errors": self.errors,
+                "queued": self._queue.qsize(),
+                "closed": self._closed,
+            }
 
     def close(self, timeout: float | None = 5.0) -> bool:
         """Drain what is queued, stop the thread. Later ``record`` calls are counted as dropped."""

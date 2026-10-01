@@ -1,6 +1,7 @@
 """The nearest-neighbour student, migrated to the DecisionModel port: unfitted it says
 nothing (uniform, never served), fitted it answers what it has seen, and the loop from
 shadow traces to a fitted student closes without anything installed."""
+
 from __future__ import annotations
 
 import unittest
@@ -10,8 +11,8 @@ from praxis_core.confidence import argmax, confidence
 from praxis_core.contracts import Capability, Question
 from praxis_core.dataset import examples_from_traces
 from praxis_core.ports import DecisionModel
-from praxis_core.router import DecisionRouter, RoutingPolicy
 from praxis_core.providers.fake import FakeTeacher, FakeTraceSink
+from praxis_core.router import DecisionRouter, RoutingPolicy
 from tests.helpers import TicketGenerator, oracle, triage_capability
 
 CAP = triage_capability()
@@ -19,8 +20,9 @@ CAP = triage_capability()
 
 def shadow_traces(n: int, seed: int = 1) -> tuple[FakeTraceSink, TicketGenerator]:
     sink = FakeTraceSink()
-    router = DecisionRouter(CAP, FakeTeacher(oracle), NearestNeighbourDecisionModel(), None, sink,
-                            RoutingPolicy(0.5, stage="shadow"))
+    router = DecisionRouter(
+        CAP, FakeTeacher(oracle), NearestNeighbourDecisionModel(), None, sink, RoutingPolicy(0.5, stage="shadow")
+    )
     generator = TicketGenerator(seed)
     for ticket in generator.tickets(n):
         router.decide_state(ticket)
@@ -41,8 +43,9 @@ class TheBaselineIsADecisionModel(unittest.TestCase):
             self.assertEqual(answer.native_confidence, 0.0)
         router = DecisionRouter(CAP, FakeTeacher(oracle), model, None, FakeTraceSink(), RoutingPolicy(threshold=0.01))
         results = router.decide_state({"subject": "invoice charged twice"})
-        self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("below threshold")
-                            for r in results.values()))
+        self.assertTrue(
+            all(r.answered_by == "system2" and r.reason.startswith("below threshold") for r in results.values())
+        )
 
     def test_it_answers_something_it_has_seen(self):
         sink, _ = shadow_traces(40)
@@ -94,9 +97,15 @@ class TheBaselineIsADecisionModel(unittest.TestCase):
 
     def test_a_silently_edited_option_list_is_reported_not_learned(self):
         sink, _ = shadow_traces(10)
-        edited = Capability(CAP.name, questions=dict(
-            CAP.questions, department=Question.choice("Which team?", {**CAP.questions["department"].options,
-                                                                     "sales": "Pricing (edited)"})))
+        edited = Capability(
+            CAP.name,
+            questions=dict(
+                CAP.questions,
+                department=Question.choice(
+                    "Which team?", {**CAP.questions["department"].options, "sales": "Pricing (edited)"}
+                ),
+            ),
+        )
         examples, report = examples_from_traces(sink.read(), edited)
         self.assertEqual(report["skipped_hash_mismatch"], 10)
         self.assertEqual(report["examples"], 20)

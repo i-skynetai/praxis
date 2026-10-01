@@ -8,6 +8,7 @@ never pulls a vendor SDK and a missing extra fails with the line that installs i
 The CLI and the demo reach adapters through the neutral factories below, so no vendor
 name appears outside this package (a test enforces it).
 """
+
 from __future__ import annotations
 
 from typing import Any

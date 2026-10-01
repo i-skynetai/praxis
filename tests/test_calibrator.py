@@ -1,5 +1,6 @@
 """The temperature calibrator: one temperature per (question type, option count), fitted
 on traces that carry both a raw System-1 distribution and a System-2 label."""
+
 from __future__ import annotations
 
 import math
@@ -20,23 +21,43 @@ from tests.helpers import triage_capability
 CAP = triage_capability()
 
 
-def synthetic(rng: random.Random, question: Question, n: int, true_temperature: float,
-              name: str = "q") -> list[TraceEvent]:
+def synthetic(
+    rng: random.Random, question: Question, n: int, true_temperature: float, name: str = "q"
+) -> list[TraceEvent]:
     """Traces where the model's raw distribution is the truth sharpened or softened by
     ``true_temperature``; the label is drawn from the truth."""
     keys = question.as_choice().keys()
     traces: list[TraceEvent] = []
     for i in range(n):
         weights = [math.exp(rng.gauss(0.0, 1.5)) for _ in keys]
-        truth = {k: w / sum(weights) for k, w in zip(keys, weights)}
+        truth = {k: w / sum(weights) for k, w in zip(keys, weights, strict=False)}
         label = rng.choices(keys, weights=[truth[k] for k in keys])[0]
         raw = scale(truth, keys, true_temperature)
-        traces.append(TraceEvent(
-            trace_id=f"{name}-{i}", capability=CAP.name, capability_kind="decision", capability_hash="h",
-            stage="shadow", answered_by="system2", abstain=False, state=f"state {i}",
-            questions=[QuestionTrace(name, question.type, question.definition_hash, question, "system2", False,
-                                     raw_distribution=raw, system2_answer=question.answer_for(label))],
-            label_candidate=True))
+        traces.append(
+            TraceEvent(
+                trace_id=f"{name}-{i}",
+                capability=CAP.name,
+                capability_kind="decision",
+                capability_hash="h",
+                stage="shadow",
+                answered_by="system2",
+                abstain=False,
+                state=f"state {i}",
+                questions=[
+                    QuestionTrace(
+                        name,
+                        question.type,
+                        question.definition_hash,
+                        question,
+                        "system2",
+                        False,
+                        raw_distribution=raw,
+                        system2_answer=question.answer_for(label),
+                    )
+                ],
+                label_candidate=True,
+            )
+        )
     return traces
 
 
@@ -86,9 +107,11 @@ class TemperatureIsFittedPerTypeAndOptionCount(unittest.TestCase):
 
     def test_groups_are_independent_and_small_groups_are_reported(self):
         rng = random.Random(5)
-        traces = (synthetic(rng, CAP.questions["department"], 60, 0.5, "c")
-                  + synthetic(rng, CAP.questions["churn_risk"], 60, 0.5, "b")
-                  + synthetic(rng, CAP.questions["urgency"], 4, 0.5, "s"))
+        traces = (
+            synthetic(rng, CAP.questions["department"], 60, 0.5, "c")
+            + synthetic(rng, CAP.questions["churn_risk"], 60, 0.5, "b")
+            + synthetic(rng, CAP.questions["urgency"], 4, 0.5, "s")
+        )
         cal = TemperatureCalibrator(min_examples=10)
         params = cal.fit(traces)
         self.assertEqual(set(params), {"choice/4", "boolean/2"})
@@ -115,7 +138,7 @@ class TemperatureIsFittedPerTypeAndOptionCount(unittest.TestCase):
             q = t.questions[0]
             assert q.raw_distribution is not None and isinstance(q.system2_answer, str)
             top = q.system2_answer
-            q.system2_answer = [top] + [k for k in ranked.keys() if k != top]
+            q.system2_answer = [top] + [k for k in ranked.keys() if k != top]  # noqa: SIM118 - Question.keys() is a method
         cal = TemperatureCalibrator()
         self.assertEqual(set(cal.fit(traces)), {"choice/3"})
         self.assertTrue(cal.is_fitted(ranked))

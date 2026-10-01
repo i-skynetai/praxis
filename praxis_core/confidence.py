@@ -9,10 +9,11 @@ providers (plan §3.2, decision 1).
 Whatever a provider reports as its own confidence is kept beside it as
 ``native_confidence`` and never used for routing.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from .contracts import Distribution, is_finite
 

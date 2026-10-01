@@ -28,11 +28,12 @@ not sure about. Every call leaves a trace. Nothing here needs a cloud or a key.
 Two capability kinds, one loop: **decision** (typed questions: choice, score, yes-no)
 and **generative** (an output against a schema: extraction, structured generation).
 
-## Try it, with nothing installed
+## Try it in sixty seconds
 
 ```bash
 git clone <this repository> && cd praxis
-python -m praxis_core demo          # or: pip install -e . && praxis demo
+python -m praxis_core demo          # the whole loop, both capability kinds, no install, no key
+make check                          # ruff + mypy --strict + 163 tests (needs: pip install -e ".[dev]")
 ```
 
 ```
@@ -161,6 +162,9 @@ A generative capability works the same way through `GenerativeRouter` with an
 
 ## What Praxis guarantees, and the test that proves each
 
+Every rule below is enforced by a named test, not by convention. The reasoning behind the
+design is in [docs/decisions.md](docs/decisions.md), one dated entry per decision.
+
 | Guarantee | Proof |
 |---|---|
 | A System-1 error, timeout or malformed answer never fails the call. It is an abstention with a reason, and the teacher serves. | `tests/test_router.py::FaultInjectionNeverFailsTheCall` — including 100 hostile calls, 100 % served by System-2 |
@@ -188,45 +192,21 @@ A generative capability works the same way through `GenerativeRouter` with an
 | **baseline** | The nearest-neighbour student behind the `DecisionModel` port: a distribution from similarity-weighted votes, the best similarity kept as `native_confidence`. Exists so the loop is demonstrably closed and a real model has a number to beat. |
 | **seam, gate, student, evaluate** | The original modules, kept for the generative path: the four-check gate, the confident-wrong metric, and a `LoraStudent` whose `fit` raises until a backend is wired in. |
 
-## Ports and adapters
-
-| Port | Today | Planned (see [ROADMAP.md](ROADMAP.md)) |
-|---|---|---|
-| `DecisionModel` | `fake`, `nearest-neighbour`, the chat-completions adapter (self-reported probabilities) | a local Apple-Silicon decision model, then a PyTorch one, a read-out layer over any open LLM, an HTTP adapter for the hosted decision API |
-| `GenerativeModel` | `fake`, `nearest-neighbour-generative`, the chat-completions adapter | a LoRA-tuned small model, after 1.0 |
-| `Teacher` | `fake`, the chat-completions adapter (any local server or proxy) | a first-party frontier adapter, after 1.0 |
-| `Calibrator` / `ScalarCalibrator` | `temperature`, `platt` | isotonic |
-| `Trainer` | `fake` | temperature refit, a closed-form head, the published fine-tuning path |
-| `TraceSink` | `jsonl`, `sqlite`, `queued`, `fake` | Postgres, object store |
-| `SchemaValidator` | `dict-of-types` | Pydantic, JSON Schema |
-| `Registry` | `fake` | a local JSON manifest |
-
-The core promises the contract, not an adapter. The package is standard library only;
-each adapter beyond the two that ship with it is a pip extra.
-
-## The training ladder
-
-Climb per capability and stop at the first rung whose scorecard clears the gate.
-**A** use a pretrained decision model as shipped and fit a temperature on gated traces
-(minutes, CPU). **B** fit a head or a threshold on labelled traces, no gradients
-(seconds). **C** fine-tune the decision model on the decision dataset, then recalibrate
-(hours, a small GPU). **D** LoRA a small causal LM, for generative capabilities only.
-Rung A alone clears the gate for a large share of routing-type capabilities.
-
 ## Documentation
 
 | | |
 |---|---|
-| [Architecture](docs/architecture.md) | The contract, the eight router steps, the envelope, and where each decision is made |
+| [Architecture](docs/architecture.md) | The contract, the eight router steps, the envelope, the ports and adapters, the training ladder |
+| [Design decisions](docs/decisions.md) | Twelve dated decisions: what, why, and what each costs |
 | [Roadmap](ROADMAP.md) | Every planned feature with an ID, a status and an owner |
 | [v1.0 release plan](docs/release-plan-v1.0.md) | What the MVP is, what waits, and the gates |
 | [Changelog](CHANGELOG.md) | What changed in each version |
 | [Distillation](docs/distillation.md) | The generative path: wiring a LoRA student, and what to measure first |
-| [Contributing](CONTRIBUTING.md) | Running the checks, and what a change needs |
+| [Contributing](CONTRIBUTING.md) | `make check`, what a change needs, and how to pick a roadmap row |
 
 ## Status
 
-Version **0.3.0**, the first milestone of the [v1.0 plan](docs/release-plan-v1.0.md).
+Version **0.3.1**, the first milestone of the [v1.0 plan](docs/release-plan-v1.0.md).
 Python 3.11+, standard library only at runtime. **163 tests**, run by CI on 3.11 to
 3.14; `mypy --strict` on everything but the legacy modules. Distribution `praxis-core`,
 import `praxis_core`, command `praxis`; not on PyPI yet. Next: 0.4.0, trust the data and

@@ -1,6 +1,7 @@
 """PX-024: one adapter over the OpenAI-compatible wire protocol in three roles, tested
 against a standard-library fake server. The live test against a local server runs only
 when PRAXIS_LIVE=1 and the server answers."""
+
 from __future__ import annotations
 
 import json
@@ -12,8 +13,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from praxis_core.contracts import Capability, Question
+from praxis_core.demo import support_extract
 from praxis_core.ports import DecisionModel, GenerativeModel, Teacher
 from praxis_core.providers._extras import require
+from praxis_core.providers.fake import FakeTraceSink
 from praxis_core.providers.openai_compat import (
     CONFIDENCE_FIELD,
     OpenAICompatible,
@@ -22,23 +25,32 @@ from praxis_core.providers.openai_compat import (
     distributions_schema,
     output_schema_json,
 )
-from praxis_core.providers.fake import FakeTraceSink
 from praxis_core.router import DecisionRouter, GenerativeRouter, RoutingPolicy, TeacherError
-from praxis_core.demo import support_extract
 from tests.helpers import triage_capability
 
 CAP = triage_capability()
 EXTRACT = support_extract()
-TICKET = {"subject": "invoice charged twice", "body": "why was I charged twice on the invoice for my Nimbus router, "
-                                                    "order #AB1234. we need this today. we might switch providers."}
+TICKET = {
+    "subject": "invoice charged twice",
+    "body": "why was I charged twice on the invoice for my Nimbus router, "
+    "order #AB1234. we need this today. we might switch providers.",
+}
 
 
 def completion(content: Any, usage: dict[str, int] | None = None, refusal: str | None = None) -> dict[str, Any]:
-    message: dict[str, Any] = {"role": "assistant", "content": content if isinstance(content, str) else json.dumps(content)}
+    message: dict[str, Any] = {
+        "role": "assistant",
+        "content": content if isinstance(content, str) else json.dumps(content),
+    }
     if refusal is not None:
         message["refusal"] = refusal
-    return {"id": "x", "object": "chat.completion", "model": "fake", "choices": [{"index": 0, "message": message,
-            "finish_reason": "stop"}], "usage": usage or {"prompt_tokens": 100, "completion_tokens": 20}}
+    return {
+        "id": "x",
+        "object": "chat.completion",
+        "model": "fake",
+        "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
+        "usage": usage or {"prompt_tokens": 100, "completion_tokens": 20},
+    }
 
 
 class FakeServer:
@@ -52,10 +64,15 @@ class FakeServer:
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self) -> None:  # noqa: N802
                 length = int(self.headers.get("Content-Length", "0"))
-                server.requests.append({"path": self.path, "headers": dict(self.headers),
-                                        "body": json.loads(self.rfile.read(length) or b"{}")})
+                server.requests.append(
+                    {
+                        "path": self.path,
+                        "headers": dict(self.headers),
+                        "body": json.loads(self.rfile.read(length) or b"{}"),
+                    }
+                )
                 status, body = server.replies.pop(0) if server.replies else (200, completion({}))
-                payload = (body if isinstance(body, (bytes, str)) else json.dumps(body))
+                payload = body if isinstance(body, (bytes, str)) else json.dumps(body)
                 raw = payload.encode() if isinstance(payload, str) else payload
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
@@ -79,8 +96,9 @@ class FakeServer:
 class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
     def setUp(self) -> None:
         self.server = FakeServer()
-        self.adapter = OpenAICompatible(self.server.base_url, "test-model", "secret", backoff_s=0.0,
-                                        price_per_million=(1.0, 10.0))
+        self.adapter = OpenAICompatible(
+            self.server.base_url, "test-model", "secret", backoff_s=0.0, price_per_million=(1.0, 10.0)
+        )
 
     def tearDown(self) -> None:
         self.server.close()
@@ -130,10 +148,18 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
             self.adapter.answer(TICKET, CAP.questions)
 
     def test_system1_role_asks_for_distributions_and_normalises(self):
-        self.server.replies.append((200, completion({
-            "department": {"billing": 8, "technical": 1, "account": 0.5, "sales": 0.5},
-            "urgency": {"0": 0.1, "1": 0.2, "2": 0.6, "3": 0.1},
-            "churn_risk": {"true": 0.7, "false": 0.3}})))
+        self.server.replies.append(
+            (
+                200,
+                completion(
+                    {
+                        "department": {"billing": 8, "technical": 1, "account": 0.5, "sales": 0.5},
+                        "urgency": {"0": 0.1, "1": 0.2, "2": 0.6, "3": 0.1},
+                        "churn_risk": {"true": 0.7, "false": 0.3},
+                    }
+                ),
+            )
+        )
         raw = self.adapter.decide(TICKET, CAP.questions)
         self.assertAlmostEqual(sum(raw["department"].distribution.values()), 1.0)
         self.assertAlmostEqual(raw["department"].distribution["billing"], 0.8)
@@ -142,14 +168,30 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         schema = self.server.requests[0]["body"]["response_format"]["json_schema"]["schema"]
         self.assertEqual(schema, distributions_schema(CAP.questions))
         self.assertIn("sum to 1", self.server.requests[0]["body"]["messages"][1]["content"])
-        self.server.replies.append((200, completion({"department": {"billing": 0, "technical": 0, "account": 0, "sales": 0},
-                                                      "urgency": {}, "churn_risk": {}})))
+        self.server.replies.append(
+            (
+                200,
+                completion(
+                    {
+                        "department": {"billing": 0, "technical": 0, "account": 0, "sales": 0},
+                        "urgency": {},
+                        "churn_risk": {},
+                    }
+                ),
+            )
+        )
         with self.assertRaises(ProviderError):
             self.adapter.decide(TICKET, CAP.questions)
 
     def test_generative_role_strips_the_confidence_field(self):
-        self.server.replies.append((200, completion({"product": "Nimbus router", "issue": "double_charge",
-                                                      "order_id": "AB1234", CONFIDENCE_FIELD: 0.83})))
+        self.server.replies.append(
+            (
+                200,
+                completion(
+                    {"product": "Nimbus router", "issue": "double_charge", "order_id": "AB1234", CONFIDENCE_FIELD: 0.83}
+                ),
+            )
+        )
         answer = self.adapter.generate(TICKET, EXTRACT.instructions, EXTRACT.output_schema)
         self.assertEqual(answer.output, {"product": "Nimbus router", "issue": "double_charge", "order_id": "AB1234"})
         self.assertAlmostEqual(answer.confidence, 0.83)
@@ -157,7 +199,9 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         self.assertEqual(schema, output_schema_json(EXTRACT.output_schema))
         self.assertIn(CONFIDENCE_FIELD, schema["required"])
         self.server.replies.append((200, completion({"product": "x", "issue": "y", "order_id": ""})))
-        self.assertEqual(self.adapter.generate(TICKET, "", EXTRACT.output_schema).confidence, 0.0, "missing confidence is 0")
+        self.assertEqual(
+            self.adapter.generate(TICKET, "", EXTRACT.output_schema).confidence, 0.0, "missing confidence is 0"
+        )
 
     def test_refusals_bad_bodies_and_http_errors(self):
         self.server.replies.append((200, completion("", refusal="I cannot help with that")))
@@ -177,8 +221,13 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         self.assertEqual(len(self.server.requests), 4, "a 400 is not retried")
 
     def test_429_and_5xx_are_retried_then_raised(self):
-        self.server.replies.extend([(503, {"error": "busy"}), (429, {"error": "slow down"}),
-                                    (200, completion({"department": "billing", "urgency": 1, "churn_risk": False}))])
+        self.server.replies.extend(
+            [
+                (503, {"error": "busy"}),
+                (429, {"error": "slow down"}),
+                (200, completion({"department": "billing", "urgency": 1, "churn_risk": False})),
+            ]
+        )
         answers = self.adapter.answer(TICKET, CAP.questions)
         self.assertEqual(answers["department"].answer, "billing")
         self.assertEqual(len(self.server.requests), 3)
@@ -198,6 +247,7 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         student = OpenAICompatible(self.server.base_url, "m", retries=0)
         from praxis_core.providers.fake import FakeTeacher
         from tests.helpers import oracle
+
         router = DecisionRouter(CAP, FakeTeacher(oracle), student, None, FakeTraceSink(), RoutingPolicy(0.5))
         results = router.decide_state(TICKET)
         self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("error:") for r in results.values()))
@@ -205,8 +255,14 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         router2 = DecisionRouter(CAP, student, None, None, FakeTraceSink(), RoutingPolicy(0.5))
         with self.assertRaises(TeacherError):
             router2.decide_state(TICKET)
-        self.server.replies.append((200, completion({"product": "Nimbus router", "issue": "double_charge",
-                                                      "order_id": "AB1234", CONFIDENCE_FIELD: 0.9})))
+        self.server.replies.append(
+            (
+                200,
+                completion(
+                    {"product": "Nimbus router", "issue": "double_charge", "order_id": "AB1234", CONFIDENCE_FIELD: 0.9}
+                ),
+            )
+        )
         gen = GenerativeRouter(EXTRACT, student, None, None, FakeTraceSink(), RoutingPolicy(0.5))
         self.assertEqual(gen.generate_state(TICKET).output["order_id"], "AB1234")
 
@@ -228,8 +284,10 @@ class TheExtrasRule(unittest.TestCase):
 
     def test_importing_the_providers_package_pulls_no_vendor_module(self):
         import sys
+
         import praxis_core.providers  # noqa: F401
         import praxis_core.providers.openai_compat  # noqa: F401
+
         for vendor in ("mlx", "laya_mlx", "openai", "anthropic", "torch", "transformers"):
             self.assertNotIn(vendor, sys.modules)
 
@@ -256,7 +314,7 @@ class LiveAgainstALocalServer(unittest.TestCase):
         for name, q in CAP.questions.items():
             self.assertTrue(q.is_valid_answer(answers[name].answer), (name, answers[name].answer))
         raw = adapter.decide(TICKET, CAP.questions)
-        for name, q in CAP.questions.items():
+        for name in CAP.questions:
             self.assertAlmostEqual(sum(raw[name].distribution.values()), 1.0, places=6)
         out = adapter.generate(TICKET, EXTRACT.instructions, EXTRACT.output_schema)
         self.assertEqual(set(out.output), set(EXTRACT.output_schema))

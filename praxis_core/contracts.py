@@ -28,6 +28,7 @@ Naming decisions taken here (plan §5):
   ``boolean`` question the keys are ``"true"`` and ``"false"``. This keeps every
   distribution a ``dict[str, float]`` that survives JSON unchanged.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -35,9 +36,10 @@ import json
 import math
 import re
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Literal, Mapping, Sequence, cast
+from datetime import UTC, datetime
+from typing import Any, Literal, cast
 
 ENVELOPE_VERSION = 2
 
@@ -73,6 +75,7 @@ _CAPABILITY_NAME = re.compile(r"^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$")
 
 # --------------------------------------------------------------------------- helpers
 
+
 def stable_hash(value: object) -> str:
     """A short, stable digest of any JSON-serialisable value. Used for definition hashes."""
     blob = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
@@ -80,7 +83,7 @@ def stable_hash(value: object) -> str:
 
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
 def new_trace_id() -> str:
@@ -104,7 +107,7 @@ def _literal(value: object, allowed: tuple[str, ...], what: str) -> str:
 
 
 def _answer_from_json(value: object) -> Answer:
-    if isinstance(value, bool) or isinstance(value, int) or isinstance(value, str):
+    if isinstance(value, (bool, int, str)):
         return value
     if isinstance(value, list):
         return [str(item) for item in value]
@@ -142,6 +145,7 @@ def _optional_float(value: object) -> float | None:
 
 
 # ----------------------------------------------------------------------- Question
+
 
 @dataclass(frozen=True)
 class Question:
@@ -258,8 +262,9 @@ class Question:
 
     def is_valid_answer(self, answer: Answer) -> bool:
         if self.type == "rank":
-            return (isinstance(answer, list) and sorted(answer) == sorted(self.options)
-                    and len(answer) == len(self.options))
+            return (
+                isinstance(answer, list) and sorted(answer) == sorted(self.options) and len(answer) == len(self.options)
+            )
         try:
             self.key_for(answer)
         except ValueError:
@@ -279,19 +284,27 @@ class Question:
 
     # serialisation -------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
-        return {"type": self.type, "instructions": self.instructions,
-                "options": dict(self.options), "levels": list(self.levels)}
+        return {
+            "type": self.type,
+            "instructions": self.instructions,
+            "options": dict(self.options),
+            "levels": list(self.levels),
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Question:
         options = data.get("options") or {}
         levels = data.get("levels") or []
-        return cls(normalise_question_type(data["type"]), str(data["instructions"]),
-                   {str(k): str(v) for k, v in dict(options).items()},
-                   tuple(str(level) for level in levels))
+        return cls(
+            normalise_question_type(data["type"]),
+            str(data["instructions"]),
+            {str(k): str(v) for k, v in dict(options).items()},
+            tuple(str(level) for level in levels),
+        )
 
 
 # --------------------------------------------------------------------- Capability
+
 
 @dataclass(frozen=True)
 class Capability:
@@ -329,32 +342,43 @@ class Capability:
     def definition_hash(self) -> str:
         return stable_hash(self.to_dict())
 
-    def request(self, state: State, context: RequestContext | None = None,
-                questions: Mapping[str, Question] | None = None) -> DecisionRequest:
+    def request(
+        self, state: State, context: RequestContext | None = None, questions: Mapping[str, Question] | None = None
+    ) -> DecisionRequest:
         """A request against this capability, with its declared questions unless overridden."""
-        return DecisionRequest(self.name, state, dict(questions if questions is not None else self.questions),
-                               context or RequestContext())
+        return DecisionRequest(
+            self.name, state, dict(questions if questions is not None else self.questions), context or RequestContext()
+        )
 
     def generative_request(self, state: State, context: RequestContext | None = None) -> GenerativeRequest:
         """A request against a generative capability: the state, the declared instructions and schema."""
         return GenerativeRequest(self.name, state, context or RequestContext())
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "kind": self.kind,
-                "questions": {name: q.to_dict() for name, q in self.questions.items()},
-                "instructions": self.instructions, "output_schema": dict(self.output_schema),
-                "description": self.description}
+        return {
+            "name": self.name,
+            "kind": self.kind,
+            "questions": {name: q.to_dict() for name, q in self.questions.items()},
+            "instructions": self.instructions,
+            "output_schema": dict(self.output_schema),
+            "description": self.description,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Capability:
         questions = {str(name): Question.from_dict(q) for name, q in dict(data.get("questions") or {}).items()}
-        return cls(str(data["name"]), cast(CapabilityKind, _literal(data.get("kind", "decision"), CAPABILITY_KINDS, "kind")),
-                   questions, str(data.get("instructions", "")),
-                   {str(k): str(v) for k, v in dict(data.get("output_schema") or {}).items()},
-                   str(data.get("description", "")))
+        return cls(
+            str(data["name"]),
+            cast(CapabilityKind, _literal(data.get("kind", "decision"), CAPABILITY_KINDS, "kind")),
+            questions,
+            str(data.get("instructions", "")),
+            {str(k): str(v) for k, v in dict(data.get("output_schema") or {}).items()},
+            str(data.get("description", "")),
+        )
 
 
 # ------------------------------------------------------------------------ Request
+
 
 @dataclass(frozen=True)
 class Budget:
@@ -380,15 +404,22 @@ class RequestContext:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"host_partition": self.host_partition, "caller": self.caller,
-                "budget": None if self.budget is None else self.budget.to_dict(),
-                "extra": dict(self.extra)}
+        return {
+            "host_partition": self.host_partition,
+            "caller": self.caller,
+            "budget": None if self.budget is None else self.budget.to_dict(),
+            "extra": dict(self.extra),
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RequestContext:
         budget = data.get("budget")
-        return cls(_optional_str(data.get("host_partition")), _optional_str(data.get("caller")),
-                   None if budget is None else Budget.from_dict(budget), dict(data.get("extra") or {}))
+        return cls(
+            _optional_str(data.get("host_partition")),
+            _optional_str(data.get("caller")),
+            None if budget is None else Budget.from_dict(budget),
+            dict(data.get("extra") or {}),
+        )
 
 
 @dataclass(frozen=True)
@@ -404,15 +435,21 @@ class DecisionRequest:
             raise ValueError("a decision request carries at least one question")
 
     def to_dict(self) -> dict[str, Any]:
-        return {"capability": self.capability, "state": self.state,
-                "questions": {name: q.to_dict() for name, q in self.questions.items()},
-                "context": self.context.to_dict()}
+        return {
+            "capability": self.capability,
+            "state": self.state,
+            "questions": {name: q.to_dict() for name, q in self.questions.items()},
+            "context": self.context.to_dict(),
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> DecisionRequest:
-        return cls(str(data["capability"]), _state_from_json(data["state"]),
-                   {str(name): Question.from_dict(q) for name, q in dict(data["questions"]).items()},
-                   RequestContext.from_dict(data.get("context") or {}))
+        return cls(
+            str(data["capability"]),
+            _state_from_json(data["state"]),
+            {str(name): Question.from_dict(q) for name, q in dict(data["questions"]).items()},
+            RequestContext.from_dict(data.get("context") or {}),
+        )
 
 
 @dataclass(frozen=True)
@@ -429,11 +466,15 @@ class GenerativeRequest:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GenerativeRequest:
-        return cls(str(data["capability"]), _state_from_json(data["state"]),
-                   RequestContext.from_dict(data.get("context") or {}))
+        return cls(
+            str(data["capability"]),
+            _state_from_json(data["state"]),
+            RequestContext.from_dict(data.get("context") or {}),
+        )
 
 
 # ------------------------------------------------------------------------- Result
+
 
 @dataclass(frozen=True)
 class ModelInfo:
@@ -479,22 +520,47 @@ class DecisionResult:
     reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"question": self.question, "answer": self.answer, "distribution": dict(self.distribution),
-                "confidence": self.confidence, "native_confidence": self.native_confidence,
-                "calibrated": self.calibrated, "abstain": self.abstain, "answered_by": self.answered_by,
-                "provider": self.provider, "model": self.model, "version": self.version, "level": self.level,
-                "latency_ms": self.latency_ms, "cost_usd": self.cost_usd, "trace_id": self.trace_id,
-                "expected_value": self.expected_value, "reason": self.reason}
+        return {
+            "question": self.question,
+            "answer": self.answer,
+            "distribution": dict(self.distribution),
+            "confidence": self.confidence,
+            "native_confidence": self.native_confidence,
+            "calibrated": self.calibrated,
+            "abstain": self.abstain,
+            "answered_by": self.answered_by,
+            "provider": self.provider,
+            "model": self.model,
+            "version": self.version,
+            "level": self.level,
+            "latency_ms": self.latency_ms,
+            "cost_usd": self.cost_usd,
+            "trace_id": self.trace_id,
+            "expected_value": self.expected_value,
+            "reason": self.reason,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> DecisionResult:
-        return cls(str(data["question"]), _answer_from_json(data["answer"]),
-                   _distribution_from_json(data["distribution"]), float(data["confidence"]),
-                   _optional_float(data.get("native_confidence")), bool(data["calibrated"]), bool(data["abstain"]),
-                   cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
-                   str(data["provider"]), str(data["model"]), str(data.get("version", "")), str(data.get("level", "")),
-                   float(data["latency_ms"]), float(data.get("cost_usd", 0.0)), str(data["trace_id"]),
-                   _optional_float(data.get("expected_value")), str(data.get("reason", "")))
+        return cls(
+            str(data["question"]),
+            _answer_from_json(data["answer"]),
+            _distribution_from_json(data["distribution"]),
+            float(data["confidence"]),
+            _optional_float(data.get("native_confidence")),
+            bool(data["calibrated"]),
+            bool(data["abstain"]),
+            cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
+            str(data["provider"]),
+            str(data["model"]),
+            str(data.get("version", "")),
+            str(data.get("level", "")),
+            float(data["latency_ms"]),
+            float(data.get("cost_usd", 0.0)),
+            str(data["trace_id"]),
+            _optional_float(data.get("expected_value")),
+            str(data.get("reason", "")),
+        )
 
 
 @dataclass(frozen=True)
@@ -519,23 +585,47 @@ class GenerativeResult:
     reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"output": self.output, "confidence": self.confidence, "native_confidence": self.native_confidence,
-                "calibrated": self.calibrated, "abstain": self.abstain, "answered_by": self.answered_by,
-                "provider": self.provider, "model": self.model, "version": self.version, "level": self.level,
-                "latency_ms": self.latency_ms, "cost_usd": self.cost_usd, "trace_id": self.trace_id,
-                "schema_valid": self.schema_valid, "reason": self.reason}
+        return {
+            "output": self.output,
+            "confidence": self.confidence,
+            "native_confidence": self.native_confidence,
+            "calibrated": self.calibrated,
+            "abstain": self.abstain,
+            "answered_by": self.answered_by,
+            "provider": self.provider,
+            "model": self.model,
+            "version": self.version,
+            "level": self.level,
+            "latency_ms": self.latency_ms,
+            "cost_usd": self.cost_usd,
+            "trace_id": self.trace_id,
+            "schema_valid": self.schema_valid,
+            "reason": self.reason,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GenerativeResult:
-        return cls(data.get("output"), float(data["confidence"]), _optional_float(data.get("native_confidence")),
-                   bool(data["calibrated"]), bool(data["abstain"]),
-                   cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
-                   str(data["provider"]), str(data["model"]), str(data.get("version", "")), str(data.get("level", "")),
-                   float(data["latency_ms"]), float(data.get("cost_usd", 0.0)), str(data["trace_id"]),
-                   bool(data.get("schema_valid", True)), str(data.get("reason", "")))
+        return cls(
+            data.get("output"),
+            float(data["confidence"]),
+            _optional_float(data.get("native_confidence")),
+            bool(data["calibrated"]),
+            bool(data["abstain"]),
+            cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
+            str(data["provider"]),
+            str(data["model"]),
+            str(data.get("version", "")),
+            str(data.get("level", "")),
+            float(data["latency_ms"]),
+            float(data.get("cost_usd", 0.0)),
+            str(data["trace_id"]),
+            bool(data.get("schema_valid", True)),
+            str(data.get("reason", "")),
+        )
 
 
 # ------------------------------------------------------------- adapter return types
+
 
 @dataclass(frozen=True)
 class RawAnswer:
@@ -582,19 +672,35 @@ class ModelArtifact:
     created_at: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"capability": self.capability, "name": self.name, "version": self.version,
-                "provider": self.provider, "model": self.model, "level": self.level, "uri": self.uri,
-                "metrics": dict(self.metrics), "created_at": self.created_at}
+        return {
+            "capability": self.capability,
+            "name": self.name,
+            "version": self.version,
+            "provider": self.provider,
+            "model": self.model,
+            "level": self.level,
+            "uri": self.uri,
+            "metrics": dict(self.metrics),
+            "created_at": self.created_at,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ModelArtifact:
-        return cls(str(data["capability"]), str(data["name"]), str(data["version"]), str(data["provider"]),
-                   str(data["model"]), str(data.get("level", "")), str(data.get("uri", "")),
-                   {str(k): float(v) for k, v in dict(data.get("metrics") or {}).items()},
-                   str(data.get("created_at", "")))
+        return cls(
+            str(data["capability"]),
+            str(data["name"]),
+            str(data["version"]),
+            str(data["provider"]),
+            str(data["model"]),
+            str(data.get("level", "")),
+            str(data.get("uri", "")),
+            {str(k): float(v) for k, v in dict(data.get("metrics") or {}).items()},
+            str(data.get("created_at", "")),
+        )
 
 
 # ------------------------------------------------------------------------ Dataset
+
 
 @dataclass(frozen=True)
 class DecisionExample:
@@ -611,19 +717,31 @@ class DecisionExample:
     meta: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"capability": self.capability, "question_name": self.question_name,
-                "question_type": self.question_type, "state": self.state,
-                "options_or_levels": dict(self.options_or_levels), "label": self.label,
-                "label_source": self.label_source, "teacher_distribution": self.teacher_distribution,
-                "meta": dict(self.meta)}
+        return {
+            "capability": self.capability,
+            "question_name": self.question_name,
+            "question_type": self.question_type,
+            "state": self.state,
+            "options_or_levels": dict(self.options_or_levels),
+            "label": self.label,
+            "label_source": self.label_source,
+            "teacher_distribution": self.teacher_distribution,
+            "meta": dict(self.meta),
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> DecisionExample:
-        return cls(str(data["capability"]), str(data["question_name"]), normalise_question_type(data["question_type"]),
-                   _state_from_json(data["state"]), dict(data.get("options_or_levels") or {}),
-                   _answer_from_json(data["label"]),
-                   cast(LabelSource, _literal(data.get("label_source", "system2"), LABEL_SOURCES, "label_source")),
-                   _optional_distribution(data.get("teacher_distribution")), dict(data.get("meta") or {}))
+        return cls(
+            str(data["capability"]),
+            str(data["question_name"]),
+            normalise_question_type(data["question_type"]),
+            _state_from_json(data["state"]),
+            dict(data.get("options_or_levels") or {}),
+            _answer_from_json(data["label"]),
+            cast(LabelSource, _literal(data.get("label_source", "system2"), LABEL_SOURCES, "label_source")),
+            _optional_distribution(data.get("teacher_distribution")),
+            dict(data.get("meta") or {}),
+        )
 
 
 @dataclass(frozen=True)
@@ -637,17 +755,27 @@ class GenerativeExample:
     meta: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"capability": self.capability, "state": self.state, "output": self.output,
-                "label_source": self.label_source, "meta": dict(self.meta)}
+        return {
+            "capability": self.capability,
+            "state": self.state,
+            "output": self.output,
+            "label_source": self.label_source,
+            "meta": dict(self.meta),
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GenerativeExample:
-        return cls(str(data["capability"]), _state_from_json(data["state"]), data.get("output"),
-                   cast(LabelSource, _literal(data.get("label_source", "system2"), LABEL_SOURCES, "label_source")),
-                   dict(data.get("meta") or {}))
+        return cls(
+            str(data["capability"]),
+            _state_from_json(data["state"]),
+            data.get("output"),
+            cast(LabelSource, _literal(data.get("label_source", "system2"), LABEL_SOURCES, "label_source")),
+            dict(data.get("meta") or {}),
+        )
 
 
 # ------------------------------------------------------------------ Trace envelope
+
 
 @dataclass
 class GenerationTrace:
@@ -667,21 +795,38 @@ class GenerationTrace:
     reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"answered_by": self.answered_by, "abstain": self.abstain, "output": self.output,
-                "system1_output": self.system1_output, "system2_output": self.system2_output,
-                "schema_valid": self.schema_valid, "confidence": self.confidence,
-                "native_confidence": self.native_confidence, "calibrator_version": self.calibrator_version,
-                "matched": self.matched, "reason": self.reason}
+        return {
+            "answered_by": self.answered_by,
+            "abstain": self.abstain,
+            "output": self.output,
+            "system1_output": self.system1_output,
+            "system2_output": self.system2_output,
+            "schema_valid": self.schema_valid,
+            "confidence": self.confidence,
+            "native_confidence": self.native_confidence,
+            "calibrator_version": self.calibrator_version,
+            "matched": self.matched,
+            "reason": self.reason,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GenerationTrace:
         matched = data.get("matched")
         valid = data.get("schema_valid")
-        return cls(cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")), bool(data["abstain"]),
-                   data.get("output"), data.get("system1_output"), data.get("system2_output"),
-                   None if valid is None else bool(valid), _optional_float(data.get("confidence")),
-                   _optional_float(data.get("native_confidence")), _optional_str(data.get("calibrator_version")),
-                   None if matched is None else bool(matched), str(data.get("reason", "")))
+        return cls(
+            cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
+            bool(data["abstain"]),
+            data.get("output"),
+            data.get("system1_output"),
+            data.get("system2_output"),
+            None if valid is None else bool(valid),
+            _optional_float(data.get("confidence")),
+            _optional_float(data.get("native_confidence")),
+            _optional_str(data.get("calibrator_version")),
+            None if matched is None else bool(matched),
+            str(data.get("reason", "")),
+        )
+
 
 @dataclass
 class QuestionTrace:
@@ -706,25 +851,45 @@ class QuestionTrace:
     reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "question_type": self.question_type,
-                "options_or_levels_hash": self.options_or_levels_hash, "question": self.question.to_dict(),
-                "answered_by": self.answered_by, "abstain": self.abstain, "answer": self.answer,
-                "system1_answer": self.system1_answer, "system2_answer": self.system2_answer,
-                "raw_distribution": self.raw_distribution, "calibrated_distribution": self.calibrated_distribution,
-                "confidence": self.confidence, "native_confidence": self.native_confidence,
-                "calibrator_version": self.calibrator_version, "system2_distribution": self.system2_distribution,
-                "reason": self.reason}
+        return {
+            "name": self.name,
+            "question_type": self.question_type,
+            "options_or_levels_hash": self.options_or_levels_hash,
+            "question": self.question.to_dict(),
+            "answered_by": self.answered_by,
+            "abstain": self.abstain,
+            "answer": self.answer,
+            "system1_answer": self.system1_answer,
+            "system2_answer": self.system2_answer,
+            "raw_distribution": self.raw_distribution,
+            "calibrated_distribution": self.calibrated_distribution,
+            "confidence": self.confidence,
+            "native_confidence": self.native_confidence,
+            "calibrator_version": self.calibrator_version,
+            "system2_distribution": self.system2_distribution,
+            "reason": self.reason,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> QuestionTrace:
-        return cls(str(data["name"]), normalise_question_type(data["question_type"]),
-                   str(data["options_or_levels_hash"]), Question.from_dict(data["question"]),
-                   cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")), bool(data["abstain"]),
-                   _optional_answer(data.get("answer")), _optional_answer(data.get("system1_answer")),
-                   _optional_answer(data.get("system2_answer")), _optional_distribution(data.get("raw_distribution")),
-                   _optional_distribution(data.get("calibrated_distribution")), _optional_float(data.get("confidence")),
-                   _optional_float(data.get("native_confidence")), _optional_str(data.get("calibrator_version")),
-                   _optional_distribution(data.get("system2_distribution")), str(data.get("reason", "")))
+        return cls(
+            str(data["name"]),
+            normalise_question_type(data["question_type"]),
+            str(data["options_or_levels_hash"]),
+            Question.from_dict(data["question"]),
+            cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
+            bool(data["abstain"]),
+            _optional_answer(data.get("answer")),
+            _optional_answer(data.get("system1_answer")),
+            _optional_answer(data.get("system2_answer")),
+            _optional_distribution(data.get("raw_distribution")),
+            _optional_distribution(data.get("calibrated_distribution")),
+            _optional_float(data.get("confidence")),
+            _optional_float(data.get("native_confidence")),
+            _optional_str(data.get("calibrator_version")),
+            _optional_distribution(data.get("system2_distribution")),
+            str(data.get("reason", "")),
+        )
 
 
 @dataclass
@@ -793,49 +958,77 @@ class TraceEvent:
         return DecisionRequest(self.capability, self.state, {q.name: q.question for q in self.questions}, context)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"envelope_version": self.envelope_version, "trace_id": self.trace_id,
-                "parent_trace_id": self.parent_trace_id, "created_at": self.created_at,
-                "capability": self.capability, "capability_kind": self.capability_kind,
-                "capability_hash": self.capability_hash, "stage": self.stage,
-                "answered_by": self.answered_by, "abstain": self.abstain, "reason": self.reason,
-                "system1": None if self.system1 is None else self.system1.to_dict(),
-                "system2": None if self.system2 is None else self.system2.to_dict(),
-                "system1_latency_ms": self.system1_latency_ms, "system2_latency_ms": self.system2_latency_ms,
-                "latency_ms": self.latency_ms, "cost_usd": self.cost_usd,
-                "system1_error": self.system1_error, "success": self.success, "error_message": self.error_message,
-                "source": self.source, "mode": self.mode, "label_candidate": self.label_candidate,
-                "teacher_distillable": self.teacher_distillable, "dataset_version": self.dataset_version,
-                "pii_redacted": self.pii_redacted, "schema_valid": self.schema_valid,
-                "generation": None if self.generation is None else self.generation.to_dict(),
-                "questions": [q.to_dict() for q in self.questions],
-                "host_partition": self.host_partition, "caller": self.caller,
-                "state": self.state, "outcome": self.outcome, "feedback": self.feedback}
+        return {
+            "envelope_version": self.envelope_version,
+            "trace_id": self.trace_id,
+            "parent_trace_id": self.parent_trace_id,
+            "created_at": self.created_at,
+            "capability": self.capability,
+            "capability_kind": self.capability_kind,
+            "capability_hash": self.capability_hash,
+            "stage": self.stage,
+            "answered_by": self.answered_by,
+            "abstain": self.abstain,
+            "reason": self.reason,
+            "system1": None if self.system1 is None else self.system1.to_dict(),
+            "system2": None if self.system2 is None else self.system2.to_dict(),
+            "system1_latency_ms": self.system1_latency_ms,
+            "system2_latency_ms": self.system2_latency_ms,
+            "latency_ms": self.latency_ms,
+            "cost_usd": self.cost_usd,
+            "system1_error": self.system1_error,
+            "success": self.success,
+            "error_message": self.error_message,
+            "source": self.source,
+            "mode": self.mode,
+            "label_candidate": self.label_candidate,
+            "teacher_distillable": self.teacher_distillable,
+            "dataset_version": self.dataset_version,
+            "pii_redacted": self.pii_redacted,
+            "schema_valid": self.schema_valid,
+            "generation": None if self.generation is None else self.generation.to_dict(),
+            "questions": [q.to_dict() for q in self.questions],
+            "host_partition": self.host_partition,
+            "caller": self.caller,
+            "state": self.state,
+            "outcome": self.outcome,
+            "feedback": self.feedback,
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TraceEvent:
         version = int(data.get("envelope_version", ENVELOPE_VERSION))
         if version != ENVELOPE_VERSION:
-            raise ValueError(f"trace envelope version {version} is not readable by this Praxis (wants {ENVELOPE_VERSION})")
+            raise ValueError(
+                f"trace envelope version {version} is not readable by this Praxis (wants {ENVELOPE_VERSION})"
+            )
         system1, system2 = data.get("system1"), data.get("system2")
         outcome, feedback = data.get("outcome"), data.get("feedback")
         generation = data.get("generation")
         return cls(
-            trace_id=str(data["trace_id"]), capability=str(data["capability"]),
-            capability_kind=cast(CapabilityKind, _literal(data["capability_kind"], CAPABILITY_KINDS, "capability_kind")),
+            trace_id=str(data["trace_id"]),
+            capability=str(data["capability"]),
+            capability_kind=cast(
+                CapabilityKind, _literal(data["capability_kind"], CAPABILITY_KINDS, "capability_kind")
+            ),
             capability_hash=str(data["capability_hash"]),
             stage=cast(Stage, _literal(data["stage"], STAGES, "stage")),
             answered_by=cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
             abstain=bool(data["abstain"]),
             questions=[QuestionTrace.from_dict(q) for q in list(data.get("questions") or [])],
-            state=_state_from_json(data["state"]), envelope_version=version,
-            parent_trace_id=_optional_str(data.get("parent_trace_id")), created_at=str(data["created_at"]),
+            state=_state_from_json(data["state"]),
+            envelope_version=version,
+            parent_trace_id=_optional_str(data.get("parent_trace_id")),
+            created_at=str(data["created_at"]),
             reason=str(data.get("reason", "")),
             system1=None if system1 is None else ModelInfo.from_dict(system1),
             system2=None if system2 is None else ModelInfo.from_dict(system2),
             system1_latency_ms=_optional_float(data.get("system1_latency_ms")),
             system2_latency_ms=_optional_float(data.get("system2_latency_ms")),
-            latency_ms=float(data.get("latency_ms", 0.0)), cost_usd=float(data.get("cost_usd", 0.0)),
-            system1_error=_optional_str(data.get("system1_error")), success=bool(data.get("success", True)),
+            latency_ms=float(data.get("latency_ms", 0.0)),
+            cost_usd=float(data.get("cost_usd", 0.0)),
+            system1_error=_optional_str(data.get("system1_error")),
+            success=bool(data.get("success", True)),
             error_message=_optional_str(data.get("error_message")),
             source=cast(TraceSource, _literal(data.get("source", "live"), TRACE_SOURCES, "source")),
             mode=cast(TraceMode, _literal(data.get("mode", "call"), TRACE_MODES, "mode")),
@@ -845,8 +1038,11 @@ class TraceEvent:
             pii_redacted=bool(data.get("pii_redacted", False)),
             schema_valid=None if data.get("schema_valid") is None else bool(data["schema_valid"]),
             generation=None if generation is None else GenerationTrace.from_dict(generation),
-            host_partition=_optional_str(data.get("host_partition")), caller=_optional_str(data.get("caller")),
-            outcome=None if outcome is None else dict(outcome), feedback=None if feedback is None else dict(feedback))
+            host_partition=_optional_str(data.get("host_partition")),
+            caller=_optional_str(data.get("caller")),
+            outcome=None if outcome is None else dict(outcome),
+            feedback=None if feedback is None else dict(feedback),
+        )
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False)

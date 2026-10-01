@@ -3,6 +3,18 @@
 All notable changes, newest first. Versions follow semantic versioning; nothing is
 published to PyPI yet.
 
+## 0.3.1 — 2026-10-01 — the showcase bar
+
+- A **decision log** (`docs/decisions.md`): twelve dated entries, each with context,
+  decision and consequences.
+- **ruff** (lint and format) configured and enforced in CI beside mypy; the code is
+  formatted and lint-clean. A **Makefile**: `make check` is what CI runs.
+- README front page shortened to a two-minute read; the ports table and the training
+  ladder moved to the architecture doc; CONTRIBUTING points at `make check`.
+- The release plan gains "the showcase bar", a definition of done for every release:
+  runs in sixty seconds from a clone, one command checks everything, plain words,
+  every guarantee a test, every decision logged, every planned feature a claimable row.
+
 ## 0.3.0 — 2026-10-01 — capture, and both capability kinds (milestone M1 of v1.0)
 
 - **Renamed**: distribution `praxis-core`, import `praxis_core`, command `praxis`. The

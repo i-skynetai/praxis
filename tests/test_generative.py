@@ -1,6 +1,7 @@
 """PX-070 and PX-080: generative capabilities through the same router, with the validator as
 the hard gate and a scalar calibrator on the student's self-reported confidence. The
 fault-injection guarantees hold exactly as for the decision kind."""
+
 from __future__ import annotations
 
 import json
@@ -22,20 +23,22 @@ from praxis_core.contracts import (
     outputs_match,
 )
 from praxis_core.dataset import generative_examples_from_traces
+from praxis_core.demo import extract_rule_teacher, support_extract
 from praxis_core.ports import GenerativeModel, ScalarCalibrator
-from praxis_core.router import GenerativeRouter, RoutingPolicy, TeacherError
 from praxis_core.providers.fake import (
     GENERATIVE_MALFORMED_MODES,
     FakeGenerativeModel,
     FakeScalarCalibrator,
     FakeTraceSink,
 )
-from praxis_core.demo import extract_rule_teacher, support_extract
+from praxis_core.router import GenerativeRouter, RoutingPolicy, TeacherError
 from tests.helpers import TicketGenerator
 
 CAP = support_extract()
-TICKET = {"subject": "invoice charged twice", "body": "hi, why was I charged twice on the invoice for my Nimbus router, "
-                                                    "order #AB1234. we need this today."}
+TICKET = {
+    "subject": "invoice charged twice",
+    "body": "hi, why was I charged twice on the invoice for my Nimbus router, order #AB1234. we need this today.",
+}
 EXPECTED = extract_rule_teacher(TICKET, CAP.instructions, CAP.output_schema)
 APP = ModelInfo("app", "the-apps-own-model", "2026-10")
 
@@ -44,12 +47,30 @@ def teacher() -> FakeGenerativeModel:
     return FakeGenerativeModel(extract_rule_teacher, info=ModelInfo("fake", "fake-generative-teacher", "0"))
 
 
-def make(system1=None, *, policy=None, sink=None, calibrator=None, teacher_model=None, rng=None, match=None,
-         on_trace_error=None):
+def make(
+    system1=None,
+    *,
+    policy=None,
+    sink=None,
+    calibrator=None,
+    teacher_model=None,
+    rng=None,
+    match=None,
+    on_trace_error=None,
+):
     sink = sink if sink is not None else FakeTraceSink()
     t = teacher_model or teacher()
-    router = GenerativeRouter(CAP, t, system1, calibrator, sink, policy or RoutingPolicy(threshold=0.5),
-                              match=match, rng=rng, on_trace_error=on_trace_error)
+    router = GenerativeRouter(
+        CAP,
+        t,
+        system1,
+        calibrator,
+        sink,
+        policy or RoutingPolicy(threshold=0.5),
+        match=match,
+        rng=rng,
+        on_trace_error=on_trace_error,
+    )
     return router, sink, t
 
 
@@ -57,11 +78,15 @@ class TheContractsRoundTrip(unittest.TestCase):
     def test_request_result_example_and_generation_trace(self):
         req = CAP.generative_request(TICKET, RequestContext("tenant-a", "tests"))
         self.assertEqual(GenerativeRequest.from_dict(json.loads(json.dumps(req.to_dict()))), req)
-        res = GenerativeResult(EXPECTED, 0.8, 0.9, True, False, "system1", "fake", "m", "1", "", 3.0, 0.0, "t1", True, "")
+        res = GenerativeResult(
+            EXPECTED, 0.8, 0.9, True, False, "system1", "fake", "m", "1", "", 3.0, 0.0, "t1", True, ""
+        )
         self.assertEqual(GenerativeResult.from_dict(json.loads(json.dumps(res.to_dict()))), res)
         ex = GenerativeExample(CAP.name, TICKET, EXPECTED, "system2", {"trace_id": "t1"})
         self.assertEqual(GenerativeExample.from_dict(json.loads(json.dumps(ex.to_dict()))), ex)
-        g = GenerationTrace("system2", False, EXPECTED, {"product": "x"}, EXPECTED, True, 0.4, 0.9, "platt-v1/abc", False, "r")
+        g = GenerationTrace(
+            "system2", False, EXPECTED, {"product": "x"}, EXPECTED, True, 0.4, 0.9, "platt-v1/abc", False, "r"
+        )
         self.assertEqual(GenerationTrace.from_dict(json.loads(json.dumps(g.to_dict()))), g)
 
     def test_the_default_match_is_exact_after_normalisation(self):
@@ -77,6 +102,7 @@ class TheContractsRoundTrip(unittest.TestCase):
 
     def test_a_decision_capability_is_refused(self):
         from tests.helpers import triage_capability
+
         with self.assertRaises(ValueError):
             GenerativeRouter(triage_capability(), teacher())
 
@@ -112,13 +138,18 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
         class Bad(FakeScalarCalibrator):
             def apply(self, c):
                 return float("nan")
+
         router, sink, _ = make(FakeGenerativeModel(extract_rule_teacher, confidence=0.97), calibrator=Bad())
         self.assert_from_teacher(router.generate_state(TICKET), sink, "calibrator:")
 
     def test_a_hundred_hostile_calls_are_served_by_system2(self):
-        hostile = [FakeGenerativeModel(fail=ValueError("x")), FakeGenerativeModel(malformed="nan-confidence"),
-                   FakeGenerativeModel(malformed="invalid-output"), FakeGenerativeModel(delay_s=0.2),
-                   FakeGenerativeModel(malformed="not-an-answer")]
+        hostile = [
+            FakeGenerativeModel(fail=ValueError("x")),
+            FakeGenerativeModel(malformed="nan-confidence"),
+            FakeGenerativeModel(malformed="invalid-output"),
+            FakeGenerativeModel(delay_s=0.2),
+            FakeGenerativeModel(malformed="not-an-answer"),
+        ]
         sink = FakeTraceSink()
         for i in range(100):
             router, _, _ = make(hostile[i % 5], sink=sink, policy=RoutingPolicy(0.5, system1_timeout_ms=20))
@@ -128,8 +159,11 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
 
     def test_the_trace_path_never_raises(self):
         seen: list[BaseException] = []
-        router, _, _ = make(FakeGenerativeModel(extract_rule_teacher, confidence=0.97),
-                            sink=FakeTraceSink(fail=OSError("disk full")), on_trace_error=seen.append)
+        router, _, _ = make(
+            FakeGenerativeModel(extract_rule_teacher, confidence=0.97),
+            sink=FakeTraceSink(fail=OSError("disk full")),
+            on_trace_error=seen.append,
+        )
         self.assertEqual(router.generate_state(TICKET).answered_by, "system1")
         self.assertEqual(router.stats.trace_failures, 1)
         self.assertEqual(len(seen), 1)
@@ -166,8 +200,11 @@ class ServeShadowCanaryObserve(unittest.TestCase):
         self.assertEqual(router.stats.as_dict()["shadow_agreement"], 0.0)
 
     def test_canary_share(self):
-        router, _, _ = make(FakeGenerativeModel(extract_rule_teacher, confidence=0.97),
-                            policy=RoutingPolicy(0.5, stage="canary", canary_share=0.5), rng=random.Random(2))
+        router, _, _ = make(
+            FakeGenerativeModel(extract_rule_teacher, confidence=0.97),
+            policy=RoutingPolicy(0.5, stage="canary", canary_share=0.5),
+            rng=random.Random(2),
+        )
         for _ in range(40):
             router.generate_state(TICKET)
         s = router.stats.as_dict()
@@ -175,8 +212,9 @@ class ServeShadowCanaryObserve(unittest.TestCase):
         self.assertGreater(s["system2_questions"], 0)
 
     def test_calibrated_flag_and_version(self):
-        router, sink, _ = make(FakeGenerativeModel(extract_rule_teacher, confidence=0.97),
-                               calibrator=FakeScalarCalibrator(fitted=True))
+        router, sink, _ = make(
+            FakeGenerativeModel(extract_rule_teacher, confidence=0.97), calibrator=FakeScalarCalibrator(fitted=True)
+        )
         self.assertTrue(router.generate_state(TICKET).calibrated)
         g = sink.traces[-1].generation
         assert g is not None
@@ -184,8 +222,11 @@ class ServeShadowCanaryObserve(unittest.TestCase):
 
     def test_a_host_match_function_is_used(self):
         loose = FakeGenerativeModel(lambda s, i, sch: {**EXPECTED, "order_id": "ab1234"}, 0.9)
-        router, sink, _ = make(loose, policy=RoutingPolicy(0.5, stage="shadow"),
-                               match=lambda a, b: a["product"] == b["product"] and a["issue"] == b["issue"])
+        router, sink, _ = make(
+            loose,
+            policy=RoutingPolicy(0.5, stage="shadow"),
+            match=lambda a, b: a["product"] == b["product"] and a["issue"] == b["issue"],
+        )
         router.generate_state(TICKET)
         g = sink.traces[-1].generation
         assert g is not None
@@ -193,13 +234,15 @@ class ServeShadowCanaryObserve(unittest.TestCase):
 
     def test_require_calibrated_refuses_an_uncalibrated_student(self):
         model = FakeGenerativeModel(extract_rule_teacher, confidence=0.97)
-        router, sink, _ = make(model, calibrator=FakeScalarCalibrator(fitted=False),
-                               policy=RoutingPolicy(0.5, require_calibrated=True))
+        router, sink, _ = make(
+            model, calibrator=FakeScalarCalibrator(fitted=False), policy=RoutingPolicy(0.5, require_calibrated=True)
+        )
         r = router.generate_state(TICKET)
         self.assertEqual(r.answered_by, "system2")
         self.assertTrue(r.reason.startswith("uncalibrated"), r.reason)
-        router, _, _ = make(model, calibrator=FakeScalarCalibrator(fitted=True),
-                            policy=RoutingPolicy(0.5, require_calibrated=True))
+        router, _, _ = make(
+            model, calibrator=FakeScalarCalibrator(fitted=True), policy=RoutingPolicy(0.5, require_calibrated=True)
+        )
         self.assertEqual(router.generate_state(TICKET).answered_by, "system1")
         router, _, _ = make(model, policy=RoutingPolicy(0.5, require_calibrated=True))
         self.assertTrue(router.generate_state(TICKET).reason.startswith("uncalibrated"), "no calibrator at all")
@@ -216,8 +259,9 @@ class ServeShadowCanaryObserve(unittest.TestCase):
 
     def test_observe_mode_records_the_apps_output_and_replays(self):
         router, sink, t = make(FakeGenerativeModel(extract_rule_teacher, confidence=0.9))
-        trace = router.observe_state(TICKET, EXPECTED, APP, latency_ms=900.0, cost_usd=0.01,
-                                     context=RequestContext("tenant-a", "svc"))
+        trace = router.observe_state(
+            TICKET, EXPECTED, APP, latency_ms=900.0, cost_usd=0.01, context=RequestContext("tenant-a", "svc")
+        )
         assert trace is not None
         self.assertEqual((trace.mode, trace.success, trace.label_candidate, t.calls), ("observe", True, True, 0))
         g = trace.generation
@@ -241,15 +285,26 @@ class ThePlattCalibrator(unittest.TestCase):
     def synthetic(rng: random.Random, n: int, over: float) -> list[TraceEvent]:
         """A student whose reported confidence c relates to the true P(right) as sigmoid(logit(p)*over)."""
         from praxis_core.calibrate import logit
+
         traces = []
         for i in range(n):
-            p = rng.uniform(0.05, 0.95)              # the true chance the output is right
-            reported = sigmoid(over * logit(p))       # over > 1: the student is over-confident
+            p = rng.uniform(0.05, 0.95)  # the true chance the output is right
+            reported = sigmoid(over * logit(p))  # over > 1: the student is over-confident
             matched = rng.random() < p
-            traces.append(TraceEvent(trace_id=f"g{i}", capability=CAP.name, capability_kind="generative",
-                                     capability_hash="h", stage="shadow", answered_by="system2", abstain=False,
-                                     questions=[], state=f"s{i}",
-                                     generation=GenerationTrace("system2", False, native_confidence=reported, matched=matched)))
+            traces.append(
+                TraceEvent(
+                    trace_id=f"g{i}",
+                    capability=CAP.name,
+                    capability_kind="generative",
+                    capability_hash="h",
+                    stage="shadow",
+                    answered_by="system2",
+                    abstain=False,
+                    questions=[],
+                    state=f"s{i}",
+                    generation=GenerationTrace("system2", False, native_confidence=reported, matched=matched),
+                )
+            )
         return traces
 
     def test_an_over_confident_student_is_softened_and_calibration_improves(self):
@@ -260,6 +315,7 @@ class ThePlattCalibrator(unittest.TestCase):
         self.assertTrue(cal.is_fitted())
         self.assertLess(params["a"], 0.6, "slope below one undoes the over-confidence")
         from praxis_core.calibrate import expected_calibration_error
+
         pairs = PlattCalibrator.pairs_from(held)
         before = expected_calibration_error([c for c, _ in pairs], [ok for _, ok in pairs])
         after = expected_calibration_error([cal.apply(c) for c, _ in pairs], [ok for _, ok in pairs])
@@ -312,8 +368,9 @@ class TheGenerativeBaselineAndDataset(unittest.TestCase):
     def test_hash_mismatch_is_reported(self):
         router, sink, _ = make(None)
         router.generate_state(TICKET)
-        edited = Capability(CAP.name, kind="generative", instructions=CAP.instructions + " Be brief.",
-                            output_schema=CAP.output_schema)
+        edited = Capability(
+            CAP.name, kind="generative", instructions=CAP.instructions + " Be brief.", output_schema=CAP.output_schema
+        )
         _, report = generative_examples_from_traces(sink.read(), edited)
         self.assertEqual(report["skipped_hash_mismatch"], 1)
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "praxis-core"
-version = "0.3.0"
+version = "0.3.1"
 description = "A provider-neutral System-1 / System-2 decision and training framework: capture what your model does, fit a small student, serve it with the big model as the permanent fallback."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -28,7 +28,7 @@ classifiers = [
 # with extras (plan §3.8); the core stays standard-library only; each adapter is an
 # extra filled in when it lands, after its provider README has been re-read.
 [project.optional-dependencies]
-dev = ["mypy>=1.10"]
+dev = ["mypy>=1.10", "ruff>=0.5"]
 # The Apple-Silicon decision model (adapter lands in PX-020). The marker mirrors the
 # wheel's own: laya-mlx 0.2.0 declares mlx only for darwin/arm64 (wheel METADATA, 2026-09-30).
 laya-mlx = ["laya-mlx>=0.2,<0.3; sys_platform == 'darwin' and platform_machine == 'arm64'"]
@@ -45,3 +45,15 @@ strict = true
 files = ["praxis_core"]
 exclude = '^praxis_core/legacy/'
 warn_unreachable = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["praxis_core/legacy"]
+
+[tool.ruff.lint]
+# E/W style, F pyflakes, I import order, UP modern syntax, B likely bugs, SIM simplifications.
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"

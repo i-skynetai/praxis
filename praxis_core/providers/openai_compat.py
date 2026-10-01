@@ -22,13 +22,15 @@ Failures raise ``ProviderError``; the routers turn a student's failure into an
 abstention and a teacher's into ``TeacherError`` after the trace is recorded. Nothing
 here catches its own mistakes, so the failure rate stays visible.
 """
+
 from __future__ import annotations
 
 import json
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from praxis_core.contracts import (
     Answer,
@@ -44,12 +46,17 @@ from praxis_core.contracts import (
 PROVIDER = "openai-compatible"
 CONFIDENCE_FIELD = "_confidence"
 _JSON_TYPES: dict[str, dict[str, Any]] = {
-    "str": {"type": "string"}, "int": {"type": "integer"}, "float": {"type": "number"},
-    "bool": {"type": "boolean"}, "list": {"type": "array", "items": {"type": "string"}},
+    "str": {"type": "string"},
+    "int": {"type": "integer"},
+    "float": {"type": "number"},
+    "bool": {"type": "boolean"},
+    "list": {"type": "array", "items": {"type": "string"}},
     "dict": {"type": "object", "additionalProperties": True},
 }
-DEFAULT_SYSTEM_PROMPT = ("You answer typed questions about a state. Read the state, then answer every question. "
-                         "Reply with JSON only, matching the schema exactly.")
+DEFAULT_SYSTEM_PROMPT = (
+    "You answer typed questions about a state. Read the state, then answer every question. "
+    "Reply with JSON only, matching the schema exactly."
+)
 
 
 class ProviderError(RuntimeError):
@@ -62,6 +69,7 @@ class ProviderError(RuntimeError):
 
 
 # ------------------------------------------------------------------ rendering
+
 
 def render_state(state: State) -> str:
     return state if isinstance(state, str) else json.dumps(state, sort_keys=True, ensure_ascii=False)
@@ -82,18 +90,23 @@ def render_questions(questions: Mapping[str, Question], *, probabilities: bool) 
         else:
             lines.append(f"- {name} (true or false): {q.instructions}")
     if probabilities:
-        lines.append("For every question give a probability for each option (for a true-or-false question, for "
-                     "\"true\" and \"false\"). The probabilities of one question must sum to 1.")
+        lines.append(
+            "For every question give a probability for each option (for a true-or-false question, for "
+            '"true" and "false"). The probabilities of one question must sum to 1.'
+        )
     return "\n".join(lines)
 
 
 def render_generative(instructions: str, output_schema: Mapping[str, str]) -> str:
     fields = ", ".join(f"{k} ({t})" for k, t in output_schema.items())
-    return (f"Task: {instructions}\nReturn an object with the fields: {fields}, plus {CONFIDENCE_FIELD}: "
-            f"your confidence between 0 and 1 that the whole object is correct.")
+    return (
+        f"Task: {instructions}\nReturn an object with the fields: {fields}, plus {CONFIDENCE_FIELD}: "
+        f"your confidence between 0 and 1 that the whole object is correct."
+    )
 
 
 # -------------------------------------------------------------------- schemas
+
 
 def answers_schema(questions: Mapping[str, Question]) -> dict[str, Any]:
     """One property per question: the typed answer."""
@@ -115,8 +128,12 @@ def distributions_schema(questions: Mapping[str, Question]) -> dict[str, Any]:
     props: dict[str, Any] = {}
     for name, q in questions.items():
         keys = list(q.keys())
-        props[name] = {"type": "object", "properties": {k: {"type": "number"} for k in keys},
-                       "required": keys, "additionalProperties": False}
+        props[name] = {
+            "type": "object",
+            "properties": {k: {"type": "number"} for k in keys},
+            "required": keys,
+            "additionalProperties": False,
+        }
     return {"type": "object", "properties": props, "required": list(questions), "additionalProperties": False}
 
 
@@ -131,13 +148,26 @@ def output_schema_json(output_schema: Mapping[str, str], with_confidence: bool =
 
 # -------------------------------------------------------------------- adapter
 
+
 class OpenAICompatible:
     """The adapter. ``base_url`` ends at ``/v1`` (for a local Ollama: ``http://localhost:11434/v1``)."""
 
-    def __init__(self, base_url: str, model: str, api_key: str | None = None, *, timeout_s: float = 60.0,
-                 temperature: float = 0.0, max_tokens: int = 512, price_per_million: tuple[float, float] = (0.0, 0.0),
-                 system_prompt: str | None = None, extra_body: Mapping[str, Any] | None = None,
-                 retries: int = 2, backoff_s: float = 0.5, info: ModelInfo | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: str | None = None,
+        *,
+        timeout_s: float = 60.0,
+        temperature: float = 0.0,
+        max_tokens: int = 512,
+        price_per_million: tuple[float, float] = (0.0, 0.0),
+        system_prompt: str | None = None,
+        extra_body: Mapping[str, Any] | None = None,
+        retries: int = 2,
+        backoff_s: float = 0.5,
+        info: ModelInfo | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
@@ -219,9 +249,14 @@ class OpenAICompatible:
 
     def _complete(self, user: str, schema: Mapping[str, Any], name: str) -> tuple[dict[str, Any], float]:
         body: dict[str, Any] = {
-            "model": self.model, "temperature": self.temperature, "max_tokens": self.max_tokens,
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
             "messages": [{"role": "system", "content": self.system_prompt}, {"role": "user", "content": user}],
-            "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": dict(schema)}},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": name, "strict": True, "schema": dict(schema)},
+            },
         }
         body.update(self.extra_body)
         reply = self._post("/chat/completions", body)
@@ -266,10 +301,15 @@ class OpenAICompatible:
             except urllib.error.HTTPError as exc:
                 status = int(exc.code)
                 snippet = exc.read()[:300].decode("utf-8", "replace")
-                error = ProviderError(f"HTTP {status} from {self.base_url}{path}: {snippet}", status,
-                                      retryable=status == 429 or status >= 500)
+                error = ProviderError(
+                    f"HTTP {status} from {self.base_url}{path}: {snippet}",
+                    status,
+                    retryable=status == 429 or status >= 500,
+                )
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
-                error = ProviderError(f"{type(exc).__name__} talking to {self.base_url}{path}: {exc}", None, retryable=True)
+                error = ProviderError(
+                    f"{type(exc).__name__} talking to {self.base_url}{path}: {exc}", None, retryable=True
+                )
             else:
                 if status >= 400:
                     raise ProviderError(f"HTTP {status}", status)
@@ -282,5 +322,5 @@ class OpenAICompatible:
                 return parsed
             if not error.retryable or attempt >= self.retries:
                 raise error
-            time.sleep(self.backoff_s * (2 ** attempt))
+            time.sleep(self.backoff_s * (2**attempt))
             attempt += 1

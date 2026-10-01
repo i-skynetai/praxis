@@ -13,15 +13,16 @@ roadmap.
 ## Running the checks
 
 ```bash
-python -m unittest discover -s tests -t .     # the suite: standard library only, no install
-python -m praxis_core demo                          # the loop end to end, under a second
-python -m mypy                                 # --strict on praxis_core (legacy excluded)
+make check                                     # = make lint typecheck test; what CI runs
+make test                                      # the suite alone: standard library only, no install
+make demo                                      # the loop end to end, both kinds, under a second
+make format                                    # ruff format + safe fixes, before you commit
 ```
 
-The first two need nothing installed. `mypy` is the one development dependency
-(`pip install -e ".[dev]"` in a virtual environment, Python 3.11 or later; 3.12 is what
-the maintainers develop in). CI runs the suite and the demo on 3.11 to 3.14 and mypy on
-3.12; a green run here is the run that matters.
+The suite and the demo need nothing installed. `ruff` and `mypy` are the two development
+dependencies (`pip install -e ".[dev]"` in a virtual environment, Python 3.11 or later;
+3.12 is what the maintainers develop in). CI runs the suite and the demo on 3.11 to 3.14,
+and ruff and mypy on 3.12; a green `make check` here is the run that matters.
 
 ## What a change needs
 
@@ -34,7 +35,7 @@ the maintainers develop in). CI runs the suite and the demo on 3.11 to 3.14 and 
   and trainers are pip extras and import their dependency lazily.
 - **No provider name outside `praxis_core/providers/`.** A test enforces that too. The core
   promises a contract, not an adapter.
-- **`mypy --strict` clean** on the files it already covers.
+- **`make check` green**: ruff (lint and format), `mypy --strict`, the suite.
 - **The demo still green.** `python -m praxis_core demo` is the README; it runs in CI.
 
 ## Adding an adapter

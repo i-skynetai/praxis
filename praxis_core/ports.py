@@ -23,9 +23,11 @@ What each port is for, in one line:
   host's schema crosses as a reference, never as a type.
 * ``Registry``  Model versions, their stage, and a manifest per capability.
 """
+
 from __future__ import annotations
 
-from typing import Any, Iterator, Mapping, Protocol, Sequence, runtime_checkable
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Any, Protocol, runtime_checkable
 
 from .contracts import (
     DecisionExample,

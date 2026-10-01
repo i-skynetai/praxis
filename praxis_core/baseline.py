@@ -19,12 +19,12 @@ trail should show it.
 It exists so the loop is demonstrably closed with nothing installed, and so a real
 System-1 model has a number to beat.
 """
+
 from __future__ import annotations
 
 import json
 import re
-from typing import Iterable, Mapping
-
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from .confidence import uniform
@@ -77,12 +77,14 @@ class NearestNeighbourDecisionModel:
         out: dict[str, RawAnswer] = {}
         for name, question in questions.items():
             keys = question.keys()
-            scored = sorted(((jaccard(query, remembered), key) for remembered, key in self._memory.get(name, ())
-                             if key in keys), key=lambda pair: -pair[0])[: self.k]
+            scored = sorted(
+                ((jaccard(query, remembered), key) for remembered, key in self._memory.get(name, ()) if key in keys),
+                key=lambda pair: -pair[0],
+            )[: self.k]
             best = scored[0][0] if scored else 0.0
             votes = {k: 0.0 for k in keys}
             for similarity, key in scored:
-                votes[key] += similarity ** 3
+                votes[key] += similarity**3
             total = sum(votes.values())
             if total <= 0.0 or best <= 0.0:
                 out[name] = RawAnswer(uniform(keys), 0.0)

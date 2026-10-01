@@ -26,6 +26,21 @@ jobs:
       - name: Run the demo with nothing installed
         run: python -m praxis_core demo --tickets 30
 
+  lint:
+    # ruff: style, imports, likely bugs, and the formatter's own check.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python -m pip install --quiet "ruff>=0.5"
+      - name: ruff check and format --check
+        run: |
+          python -m ruff check praxis_core tests
+          python -m ruff format --check praxis_core tests
+
   typecheck:
     # mypy --strict on praxis_core (legacy excluded). mypy is a development
     # dependency only; nothing at runtime needs it.
