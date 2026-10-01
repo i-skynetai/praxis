@@ -19,6 +19,13 @@ Two guarantees fall out of this. A System-1 error, timeout or malformed answer i
 abstention with a reason, never a caller-visible failure. And the trace path is
 fire-and-forget: a broken sink is counted, not raised.
 
+**Observe mode** (``observe()``) is the other way in, and the one the original design
+calls the wedge: the app keeps calling its own model and hands Praxis the answer. Praxis
+validates it, runs the configured student in shadow, records the trace with the app's
+answer as System-2, and returns the trace. It never raises, whatever it is given: a bad
+request or an invalid answer becomes a recorded failure, and anything unexpected is
+counted. The app's request path cannot be affected by capture.
+
 The teacher is the one thing that can fail the call. It is the caller's own System-2,
 there is nothing behind it, and hiding its failure would mean inventing an answer. The
 trace is recorded first, then ``TeacherError`` is raised.
@@ -118,6 +125,8 @@ class RouterStats:
     shadow_agreed: int = 0
     teacher_failures: int = 0
     trace_failures: int = 0
+    observed: int = 0
+    observe_failures: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         share = self.system1_questions / self.questions if self.questions else 0.0
@@ -127,7 +136,8 @@ class RouterStats:
                 "system1_share": round(share, 4), "abstain_reasons": dict(self.abstain_reasons),
                 "shadow_compared": self.shadow_compared, "shadow_agreed": self.shadow_agreed,
                 "shadow_agreement": None if agreement is None else round(agreement, 4),
-                "teacher_failures": self.teacher_failures, "trace_failures": self.trace_failures}
+                "teacher_failures": self.teacher_failures, "trace_failures": self.trace_failures,
+                "observed": self.observed, "observe_failures": self.observe_failures}
 
 
 def _call_with_timeout(fn: Callable[[], Mapping[str, RawAnswer]], timeout_s: float) -> _System1Call:
@@ -191,6 +201,76 @@ class DecisionRouter:
     def decide_state(self, state: str | dict[str, Any], context: Any = None) -> dict[str, DecisionResult]:
         """Convenience: a request with the capability's declared questions."""
         return self.decide(self.capability.request(state, context))
+
+    def observe_state(self, state: str | dict[str, Any], answers: Mapping[str, Answer], info: ModelInfo,
+                      latency_ms: float = 0.0, cost_usd: float = 0.0, context: Any = None, *,
+                      distributions: Mapping[str, Mapping[str, float]] | None = None) -> TraceEvent | None:
+        """Convenience: observe with the capability's declared questions."""
+        return self.observe(self.capability.request(state, context), answers, info, latency_ms, cost_usd,
+                            distributions=distributions)
+
+    def observe(self, request: DecisionRequest, answers: Mapping[str, Answer], info: ModelInfo,
+                latency_ms: float = 0.0, cost_usd: float = 0.0, *,
+                distributions: Mapping[str, Mapping[str, float]] | None = None) -> TraceEvent | None:
+        """The app made the System-2 call itself; hand Praxis the answer. Never raises.
+
+        Returns the recorded trace (``success`` is False when the request or the answer
+        was invalid, and then nothing becomes a label), or None if even recording failed.
+        """
+        try:
+            return self._observe(request, answers, info, latency_ms, cost_usd, distributions or {})
+        except Exception as exc:  # noqa: BLE001 - capture must never reach the caller
+            self.stats.observe_failures += 1
+            if self.on_trace_error is not None:
+                try:
+                    self.on_trace_error(exc)
+                except Exception:  # noqa: BLE001
+                    pass
+            return None
+
+    def _observe(self, request: DecisionRequest, answers: Mapping[str, Answer], info: ModelInfo,
+                 latency_ms: float, cost_usd: float, distributions: Mapping[str, Mapping[str, float]]) -> TraceEvent:
+        started = time.perf_counter()
+        trace_id = new_trace_id()
+        policy = self._policy
+        try:
+            self._check_request(request)
+        except ValueError as exc:
+            trace = TraceEvent(
+                trace_id=trace_id, capability=self.capability.name, capability_kind=self.capability.kind,
+                capability_hash=self.capability.definition_hash, stage=policy.stage, answered_by="system2",
+                abstain=False, questions=[], state=request.state, reason=f"observe: {exc}", system2=info,
+                system2_latency_ms=latency_ms, latency_ms=latency_ms, cost_usd=cost_usd, success=False,
+                error_message=f"observe: {exc}", source=self.source, mode="observe", label_candidate=False,
+                host_partition=request.context.host_partition, caller=request.context.caller)
+            self._record(trace)
+            self._count(trace)
+            return trace
+        system1_call = self._call_system1(request, policy.system1_timeout_ms)       # shadow, if configured
+        assessed = {name: self._assess(name, q, system1_call) for name, q in request.questions.items()}
+        given: dict[str, TeacherAnswer] = {}
+        for name in request.questions:
+            if name in answers:
+                dist = distributions.get(name)
+                given[name] = TeacherAnswer(answers[name], None if dist is None else dict(dist), 0.0)
+        error = self._check_teacher_answers(request.questions, given)
+        teacher_answers: Mapping[str, TeacherAnswer] = {} if error else given
+        results, question_traces = self._assemble(request, assessed, set(), request.questions, teacher_answers,
+                                                  system1_call, latency_ms, trace_id, policy, observe=True)
+        trace = TraceEvent(
+            trace_id=trace_id, capability=self.capability.name, capability_kind=self.capability.kind,
+            capability_hash=self.capability.definition_hash, stage=policy.stage, answered_by="system2",
+            abstain=False, questions=question_traces, state=request.state,
+            reason=error or system1_call.error or "", system1=None if self.system1 is None else self.system1.info,
+            system2=info, system1_latency_ms=None if self.system1 is None else system1_call.latency_ms,
+            system2_latency_ms=latency_ms, latency_ms=latency_ms + (time.perf_counter() - started) * 1000.0,
+            cost_usd=cost_usd, system1_error=system1_call.error, success=error is None,
+            error_message=f"observe: {error}" if error else None, source=self.source, mode="observe",
+            label_candidate=error is None, host_partition=request.context.host_partition,
+            caller=request.context.caller)
+        self._record(trace)
+        self._count(trace)
+        return trace
 
     def decide(self, request: DecisionRequest) -> dict[str, DecisionResult]:
         started = time.perf_counter()
@@ -334,7 +414,7 @@ class DecisionRouter:
     def _assemble(self, request: DecisionRequest, assessed: Mapping[str, _Assessed], served_by_system1: set[str],
                   to_teacher: Mapping[str, Question], teacher_answers: Mapping[str, TeacherAnswer],
                   system1_call: _System1Call, teacher_latency_ms: float, trace_id: str, policy: RoutingPolicy,
-                  ) -> tuple[dict[str, DecisionResult], list[QuestionTrace]]:
+                  observe: bool = False) -> tuple[dict[str, DecisionResult], list[QuestionTrace]]:
         results: dict[str, DecisionResult] = {}
         traces: list[QuestionTrace] = []
         s1_info = self.system1.info if self.system1 is not None else ModelInfo("none", "none")
@@ -352,8 +432,15 @@ class DecisionRouter:
                     system2_distribution = {k: float(teacher_answer.distribution[k]) for k in keys}
                 else:
                     system2_distribution = one_hot(keys, question.key_for(teacher_answer.answer))
-            abstain = not by_system1 and policy.stage != "shadow"
-            reason = "" if by_system1 else ("shadow: teacher serves; system1 recorded" if policy.stage == "shadow" else a.reason)
+            abstain = not by_system1 and policy.stage != "shadow" and not observe
+            if by_system1:
+                reason = ""
+            elif observe:
+                reason = "observe: the app's model served; system1 recorded in shadow"
+            elif policy.stage == "shadow":
+                reason = "shadow: teacher serves; system1 recorded"
+            else:
+                reason = a.reason
             traces.append(QuestionTrace(
                 name=name, question_type=question.type, options_or_levels_hash=question.definition_hash,
                 question=question, answered_by="system1" if by_system1 else "system2", abstain=abstain,
@@ -393,6 +480,8 @@ class DecisionRouter:
     def _count(self, trace: TraceEvent) -> None:
         s = self.stats
         s.calls += 1
+        if trace.mode == "observe":
+            s.observed += 1
         for q in trace.questions:
             s.questions += 1
             if q.answered_by == "system1":

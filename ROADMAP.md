@@ -62,8 +62,8 @@ accepted.
 
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
-| PX-100 | [Observe-mode capture: the app's own answer becomes the trace](#px-100) | capture | P0 | M | Ready | |
-| PX-101 | [Background sink: capture adds no visible latency](#px-101) — *good first issue* | trace | P0 | S | Ready | |
+| PX-100 | [Observe-mode capture: the app's own answer becomes the trace](#px-100) | capture | P0 | M | Done | 0.3.0.dev0 |
+| PX-101 | [Background sink: capture adds no visible latency](#px-101) | trace | P0 | S | Done | 0.3.0.dev0 |
 | PX-070 | [Generative capabilities through the same router](#px-070) | router | P0 | M | Ready | |
 | PX-080 | [Scalar confidence calibrator (Platt)](#px-080) — *good first issue* | calibrate | P1 | S | Ready | |
 | PX-104 | [A generative example capability beside `support.triage`](#px-104) | demo | P1 | S | Needs decision | |
@@ -109,7 +109,7 @@ accepted.
 | PX-120 | [Host integration guide: capture from your app in ten lines](#px-120) | docs | P0 | S | Ready | |
 | PX-121 | [CLI reference and README for 1.0](#px-121) | docs | P1 | S | Ready | |
 | PX-122 | [One-command definition-of-done test](#px-122) | tests | P0 | M | Ready | |
-| PX-090 | [Publish to PyPI](#px-090) | distribution | P0 | S | Needs decision | |
+| PX-090 | [Publish to PyPI](#px-090) | distribution | P0 | S | Ready | |
 
 ### After 1.0
 
@@ -409,7 +409,6 @@ table, payloads in object storage keyed by trace id, as an optional sink.
 v1; the CLI and JSON artifacts are the interface until the loop is proven.
 
 <a id="px-090"></a>**PX-090 — Publish to PyPI.** **Verified** 2026-09-30: `praxis` and
-`praxis-ai` are taken on PyPI; `praxis-core` and `praxis-learning` are free. *Decision
-needed:* the distribution name (recommendation: `praxis-core`, import name `praxis`).
+`praxis-ai` are taken on PyPI; `praxis-core` and `praxis-learning` are free. *Decided 2026-09-30:* distribution `praxis-core`, import `praxis_core`, command `praxis`; the rename landed 2026-10-01.
 *Done when:* trusted publishing from the release workflow; `pip install <name>` on a clean
 machine runs `python -m praxis_core demo`.

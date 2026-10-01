@@ -7,8 +7,8 @@ teacher, and the nearest-neighbour baseline is the System-1 student.
 
 Four stages, in the order the plan says to trust the loop before the model:
 
-1. ``shadow`` with an unfitted student: every answer comes from the teacher; the trace
-   records that System-1 had nothing to say.
+1. **observe**: the app calls its own model (here, the rule teacher) and hands Praxis the
+   answer; Praxis records it, and records that the unfitted student had nothing to say.
 2. The teacher's answers become labels, the student is fitted, and a second ``shadow``
    pass records both answers side by side. Those traces fit the calibrator.
 3. ``canary``: half the calls may be served by System-1 when it is confident.
@@ -178,11 +178,17 @@ class DemoSummary:
                 "elapsed_ms": round(self.elapsed_ms, 1)}
 
 
-def _run_stage(router: DecisionRouter, generator: TicketGenerator, n: int, label: str) -> StageReport:
+def _run_stage(router: DecisionRouter, generator: TicketGenerator, n: int, label: str,
+               observe_with: FakeTeacher | None = None) -> StageReport:
     before = router.stats.as_dict()
     started = time.perf_counter()
     for ticket in generator.tickets(n):
-        router.decide_state(ticket)
+        if observe_with is not None:                     # the app makes its own call, then reports it
+            t0 = time.perf_counter()
+            answers = {name: a.answer for name, a in observe_with.answer(ticket, router.capability.questions).items()}
+            router.observe_state(ticket, answers, observe_with.info, (time.perf_counter() - t0) * 1000.0)
+        else:
+            router.decide_state(ticket)
     elapsed = (time.perf_counter() - started) * 1000.0
     after = router.stats.as_dict()
     questions = after["questions"] - before["questions"]
@@ -221,7 +227,7 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
         say(f"{report.stage:<14}{report.calls:>6}{report.questions:>11}{report.system1_share:>8.0%} "
             f"{report.abstain_share:>8.0%}{agree:>8}{report.elapsed_ms:>7.1f}")
 
-    show(_run_stage(router, generator, tickets, "shadow-cold"))          # 1. capture with nothing to say
+    show(_run_stage(router, generator, tickets, "observe", observe_with=teacher))   # 1. the app's own answers
 
     examples, report = examples_from_traces(sink.read(capability.name), capability)
     summary.examples = student.fit(examples)                              # 2. labels → student

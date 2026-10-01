@@ -21,7 +21,7 @@ class TheDemoStaysGreen(unittest.TestCase):
         lines: list[str] = []
         summary = run_demo(out=lines.append)
         self.assertLess(summary.elapsed_ms, 1000.0)
-        self.assertEqual([s.stage for s in summary.stages], ["shadow-cold", "shadow-warm", "canary-50%", "serve"])
+        self.assertEqual([s.stage for s in summary.stages], ["observe", "shadow-warm", "canary-50%", "serve"])
         cold, warm, canary, serve = summary.stages
         self.assertEqual(cold.system1_share, 0.0)
         self.assertEqual(warm.system1_share, 0.0)

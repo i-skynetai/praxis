@@ -47,6 +47,7 @@ Stage = Literal["shadow", "canary", "serve"]
 AnsweredBy = Literal["system1", "system2"]
 LabelSource = Literal["system2", "outcome", "human"]
 TraceSource = Literal["live", "synthetic", "selfplay"]
+TraceMode = Literal["call", "observe"]
 
 QUESTION_TYPES: tuple[str, ...] = ("choice", "score", "boolean", "rank")
 QUESTION_TYPE_ALIASES: dict[str, str] = {"noul": "boolean", "bool": "boolean", "yes_no": "boolean"}
@@ -55,6 +56,7 @@ STAGES: tuple[str, ...] = ("shadow", "canary", "serve")
 ANSWERED_BY: tuple[str, ...] = ("system1", "system2")
 LABEL_SOURCES: tuple[str, ...] = ("system2", "outcome", "human")
 TRACE_SOURCES: tuple[str, ...] = ("live", "synthetic", "selfplay")
+TRACE_MODES: tuple[str, ...] = ("call", "observe")
 
 BOOLEAN_KEYS: tuple[str, str] = ("true", "false")
 
@@ -643,6 +645,7 @@ class TraceEvent:
     success: bool = True
     error_message: str | None = None
     source: TraceSource = "live"
+    mode: TraceMode = "call"
     label_candidate: bool = False
     teacher_distillable: bool = True
     dataset_version: str | None = None
@@ -664,6 +667,13 @@ class TraceEvent:
                 return q
         raise KeyError(name)
 
+    def to_request(self) -> DecisionRequest:
+        """Rebuild the request this trace recorded: the replay-equivalence property.
+        The state, every question as presented, and the host partition and caller are
+        carried; a budget and the opaque ``extra`` are not part of what a model saw."""
+        return DecisionRequest(self.capability, self.state, {q.name: q.question for q in self.questions},
+                               RequestContext(host_partition=self.host_partition, caller=self.caller))
+
     def to_dict(self) -> dict[str, Any]:
         return {"envelope_version": self.envelope_version, "trace_id": self.trace_id,
                 "parent_trace_id": self.parent_trace_id, "created_at": self.created_at,
@@ -675,7 +685,7 @@ class TraceEvent:
                 "system1_latency_ms": self.system1_latency_ms, "system2_latency_ms": self.system2_latency_ms,
                 "latency_ms": self.latency_ms, "cost_usd": self.cost_usd,
                 "system1_error": self.system1_error, "success": self.success, "error_message": self.error_message,
-                "source": self.source, "label_candidate": self.label_candidate,
+                "source": self.source, "mode": self.mode, "label_candidate": self.label_candidate,
                 "teacher_distillable": self.teacher_distillable, "dataset_version": self.dataset_version,
                 "pii_redacted": self.pii_redacted, "schema_valid": self.schema_valid,
                 "questions": [q.to_dict() for q in self.questions],
@@ -708,6 +718,7 @@ class TraceEvent:
             system1_error=_optional_str(data.get("system1_error")), success=bool(data.get("success", True)),
             error_message=_optional_str(data.get("error_message")),
             source=cast(TraceSource, _literal(data.get("source", "live"), TRACE_SOURCES, "source")),
+            mode=cast(TraceMode, _literal(data.get("mode", "call"), TRACE_MODES, "mode")),
             label_candidate=bool(data.get("label_candidate", False)),
             teacher_distillable=bool(data.get("teacher_distillable", True)),
             dataset_version=_optional_str(data.get("dataset_version")),

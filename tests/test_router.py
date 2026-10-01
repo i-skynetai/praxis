@@ -15,10 +15,11 @@ from praxis_core.contracts import (
     RequestContext,
     State,
     TeacherAnswer,
+    TraceEvent,
 )
 from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
 from praxis_core.providers.fake import MALFORMED_MODES, FakeCalibrator, FakeDecisionModel, FakeTeacher, FakeTraceSink
-from tests.helpers import oracle, triage_capability
+from tests.helpers import TicketGenerator, oracle, triage_capability
 
 CAP = triage_capability()
 TICKET = {"subject": "invoice charged twice",
@@ -336,7 +337,8 @@ class StatsHaveAStableShape(unittest.TestCase):
         router.decide_state(TICKET)
         self.assertEqual(set(router.stats.as_dict()), {
             "calls", "questions", "system1_questions", "system2_questions", "system1_share", "abstain_reasons",
-            "shadow_compared", "shadow_agreed", "shadow_agreement", "teacher_failures", "trace_failures"})
+            "shadow_compared", "shadow_agreed", "shadow_agreement", "teacher_failures", "trace_failures",
+            "observed", "observe_failures"})
 
     def test_policies_are_validated(self):
         with self.assertRaises(ValueError):
@@ -345,6 +347,92 @@ class StatsHaveAStableShape(unittest.TestCase):
             RoutingPolicy(canary_share=-0.1)
         with self.assertRaises(ValueError):
             RoutingPolicy(system1_timeout_ms=0)
+
+
+class ObserveModeNeverTouchesTheRequestPath(unittest.TestCase):
+    """PX-100: the app's own answer becomes the trace; the student runs in shadow; nothing raises."""
+
+    APP = ModelInfo("app", "the-apps-own-model", "2026-10")
+
+    def test_the_apps_answer_is_recorded_as_system2_and_the_student_in_shadow(self):
+        router, sink, teacher = make(FakeDecisionModel(pick=lambda s, n, q: q.keys()[-1], peak=0.9))
+        trace = router.observe_state(TICKET, EXPECTED, self.APP, latency_ms=812.0, cost_usd=0.004)
+        self.assertIsNotNone(trace)
+        assert trace is not None
+        self.assertEqual(trace.mode, "observe")
+        self.assertTrue(trace.success)
+        self.assertTrue(trace.label_candidate)
+        self.assertEqual(trace.system2, self.APP)
+        self.assertEqual(trace.system2_latency_ms, 812.0)
+        self.assertEqual(trace.cost_usd, 0.004)
+        self.assertEqual(teacher.calls, 0, "Praxis never called a teacher; the app did")
+        for q in trace.questions:
+            self.assertEqual(q.answered_by, "system2")
+            self.assertFalse(q.abstain)
+            self.assertEqual(q.system2_answer, EXPECTED[q.name])
+            self.assertIsNotNone(q.system1_answer, "the student ran in shadow")
+            self.assertIn("observe", q.reason)
+        self.assertEqual(sink.traces[-1], trace)
+        self.assertEqual(router.stats.observed, 1)
+        self.assertEqual(router.stats.shadow_compared, 3)
+
+    def test_replay_equivalence_the_trace_rebuilds_the_request(self):
+        router, sink, _ = make(None)
+        request = CAP.request(TICKET, RequestContext(host_partition="tenant-a", caller="checkout-service"))
+        trace = router.observe(request, EXPECTED, self.APP)
+        assert trace is not None
+        again = TraceEvent.from_json(trace.to_json()).to_request()
+        self.assertEqual(again.capability, request.capability)
+        self.assertEqual(again.state, request.state)
+        self.assertEqual(again.questions, request.questions)
+        self.assertEqual(again.context.host_partition, "tenant-a")
+        self.assertEqual(again.context.caller, "checkout-service")
+        narrowed = dict(CAP.questions, department=Question.choice("Which team?", {"billing": "B", "technical": "T"}))
+        trace2 = router.observe(CAP.request(TICKET, questions=narrowed), EXPECTED, self.APP)
+        assert trace2 is not None
+        self.assertEqual(trace2.to_request().questions["department"].options, {"billing": "B", "technical": "T"})
+
+    def test_an_invalid_answer_is_a_recorded_failure_not_a_label(self):
+        router, sink, _ = make(None)
+        trace = router.observe_state(TICKET, {"department": "nonsense", "urgency": 2, "churn_risk": True}, self.APP)
+        assert trace is not None
+        self.assertFalse(trace.success)
+        self.assertFalse(trace.label_candidate)
+        self.assertIn("declared set", trace.error_message or "")
+        self.assertEqual(len(sink.traces), 1)
+        missing = router.observe_state(TICKET, {"department": "billing"}, self.APP)
+        assert missing is not None
+        self.assertFalse(missing.success)
+        self.assertIn("no answer for", missing.error_message or "")
+
+    def test_a_bad_request_is_recorded_and_nothing_raises(self):
+        router, sink, _ = make(None)
+        other = Capability("support.other", questions=CAP.questions)
+        trace = router.observe(other.request(TICKET), EXPECTED, self.APP)
+        assert trace is not None
+        self.assertFalse(trace.success)
+        self.assertIn("this router serves", trace.error_message or "")
+        self.assertEqual(trace.questions, [])
+
+    def test_nothing_the_app_passes_can_raise(self):
+        router, _, _ = make(FakeDecisionModel(malformed="nan"), sink=FakeTraceSink(fail=RuntimeError("disk full")))
+        for answers in (EXPECTED, {}, {"department": object()}, {"urgency": "high"}, None):  # type: ignore[list-item]
+            trace = router.observe_state(TICKET, answers or {}, self.APP)
+            self.assertTrue(trace is None or trace.mode == "observe")
+        self.assertEqual(router.stats.observe_failures, 0, "every case was handled, none escaped")
+        self.assertGreaterEqual(router.stats.trace_failures, 1, "the dead sink was counted")
+
+    def test_observed_traces_become_examples_and_fit_the_student(self):
+        from praxis_core.baseline import NearestNeighbourDecisionModel
+        from praxis_core.dataset import examples_from_traces
+        router, sink, teacher = make(None)
+        for ticket in TicketGenerator(3).tickets(20):
+            answers = {n: a.answer for n, a in teacher.answer(ticket, CAP.questions).items()}
+            router.observe_state(ticket, answers, self.APP)
+        examples, report = examples_from_traces(sink.read(), CAP)
+        self.assertEqual(report["examples"], 60)
+        student = NearestNeighbourDecisionModel()
+        self.assertEqual(student.fit(examples), 60)
 
 
 if __name__ == "__main__":
