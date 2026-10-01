@@ -29,6 +29,9 @@ classifiers = [
 # extra filled in when it lands, after its provider README has been re-read.
 [project.optional-dependencies]
 dev = ["mypy>=1.10"]
+# The Apple-Silicon decision model (adapter lands in PX-020). The marker mirrors the
+# wheel's own: laya-mlx 0.2.0 declares mlx only for darwin/arm64 (wheel METADATA, 2026-09-30).
+laya-mlx = ["laya-mlx>=0.2,<0.3; sys_platform == 'darwin' and platform_machine == 'arm64'"]
 
 [project.scripts]
 praxis = "praxis_core.cli:main"

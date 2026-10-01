@@ -1,6 +1,6 @@
 # PX-024 — OpenAI-compatible local adapter: student, System-1 and teacher
 
-**Status:** Proposed · **Owner:** — · **Issue:** —
+**Status:** Done (0.3.0) · **Owner:** @arupmmi07 2026-10-01 · **Issue:** —
 
 > **Scope widened on 2026-09-30** after re-reading the original design: one adapter over
 > the OpenAI-compatible wire protocol plays three roles. As a **generative student**

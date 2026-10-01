@@ -274,14 +274,25 @@ def _run_stage(router: DecisionRouter, generator: TicketGenerator, n: int, label
                        agreed / compared if compared else None, elapsed)
 
 
+@dataclass
+class Providers:
+    """Real adapters to stand in for the fakes, per role. ``None`` keeps the fake. With a
+    real model each call takes seconds, so pass a small ``--tickets``."""
+
+    teacher: Any = None          # Teacher for triage, and GenerativeModel for extract
+    system1: Any = None          # DecisionModel for triage
+    student: Any = None          # GenerativeModel for extract
+
+
 def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: TraceSink | None = None,
-             out: Callable[[str], None] | None = print) -> DemoSummary:
+             out: Callable[[str], None] | None = print, providers: Providers | None = None) -> DemoSummary:
     say = out or (lambda _line: None)
+    providers = providers or Providers()
     started = time.perf_counter()
     capability = support_triage()
     generator = TicketGenerator(seed)
-    teacher = FakeTeacher(rule_teacher)
-    student = NearestNeighbourDecisionModel()
+    teacher: Any = providers.teacher or FakeTeacher(rule_teacher)
+    student: Any = providers.system1 or NearestNeighbourDecisionModel()
     calibrator = TemperatureCalibrator(min_examples=10)
     sink = sink if sink is not None else FakeTraceSink()
     router = DecisionRouter(capability, teacher, student, calibrator, sink,
@@ -289,8 +300,8 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
                             rng=random.Random(seed), source="synthetic")
     summary = DemoSummary()
 
-    say(f"praxis demo: {capability.name}, {len(capability.questions)} questions, fake teacher, "
-        f"{student.name} student, threshold {threshold}")
+    say(f"praxis demo: {capability.name}, {len(capability.questions)} questions, "
+        f"{teacher.info.model} teacher, {student.info.model} student, threshold {threshold}")
     say("")
     say(f"{'stage':<14}{'calls':>6}{'questions':>11}{'system1':>9}{'abstain':>9}{'agree':>8}{'ms':>7}")
 
@@ -303,7 +314,7 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
     show(_run_stage(router, generator, tickets, "observe", observe_with=teacher))   # 1. the app's own answers
 
     examples, report = examples_from_traces(sink.read(capability.name), capability)
-    summary.examples = student.fit(examples)                              # 2. labels → student
+    summary.examples = student.fit(examples) if hasattr(student, "fit") else 0   # 2. labels → student
     warm = _run_stage(router, generator, tickets, "shadow-warm")          #    both answers side by side
     show(warm)
     summary.temperatures = dict(calibrator.fit(list(sink.read(capability.name))))  # → calibrator
@@ -342,7 +353,7 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
     say(f"served by System-1 in the serve stage: {summary.served_by_system1}; the teacher would have "
         f"disagreed on {summary.confident_wrong} (confident-wrong)")
 
-    _run_extract(summary, tickets, threshold, seed, sink, say)
+    _run_extract(summary, tickets, threshold, seed, sink, say, providers)
 
     summary.trace_count = sum(1 for _ in sink.read(capability.name))
     summary.elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -355,19 +366,20 @@ def run_demo(tickets: int = 60, threshold: float = 0.5, seed: int = 7, sink: Tra
 
 
 def _run_extract(summary: DemoSummary, tickets: int, threshold: float, seed: int, sink: TraceSink,
-                 say: Callable[[str], None]) -> None:
+                 say: Callable[[str], None], providers: Providers) -> None:
     """The same four stages for the generative capability, on the same kind of traffic."""
     capability = support_extract()
     generator = TicketGenerator(seed + 1)
-    teacher = FakeGenerativeModel(extract_rule_teacher, info=ModelInfo("fake", "fake-extract-teacher", "0"))
-    student = NearestNeighbourGenerativeModel()
+    teacher: Any = providers.teacher or FakeGenerativeModel(extract_rule_teacher,
+                                                            info=ModelInfo("fake", "fake-extract-teacher", "0"))
+    student: Any = providers.student or NearestNeighbourGenerativeModel()
     calibrator = PlattCalibrator(min_examples=10)
     router = GenerativeRouter(capability, teacher, student, calibrator, sink,
                               RoutingPolicy(threshold=threshold, stage="shadow", canary_share=0.5,
                                             require_calibrated=True),
                               rng=random.Random(seed), source="synthetic")
     say("")
-    say(f"{capability.name}: 3 fields, fake teacher, {student.name} student, threshold {threshold}")
+    say(f"{capability.name}: 3 fields, {teacher.info.model} teacher, {student.info.model} student, threshold {threshold}")
     say("")
     say(f"{'stage':<14}{'calls':>6}{'questions':>11}{'system1':>9}{'abstain':>9}{'agree':>8}{'ms':>7}")
 
@@ -403,7 +415,7 @@ def _run_extract(summary: DemoSummary, tickets: int, threshold: float, seed: int
 
     stage("observe", observe=True)
     examples, report = generative_examples_from_traces(sink.read(capability.name), capability)
-    summary.extract_examples = student.fit(examples)
+    summary.extract_examples = student.fit(examples) if hasattr(student, "fit") else 0
     warm = stage("shadow-warm")
     summary.extract_platt = dict(calibrator.fit(list(sink.read(capability.name))))
     summary.extract_verdict = readiness(warm.agreement, warm.questions, calibrator.is_fitted())

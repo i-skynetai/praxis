@@ -67,8 +67,8 @@ accepted.
 | PX-070 | [Generative capabilities through the same router](#px-070) | router | P0 | M | Done | 0.3.0.dev0 |
 | PX-080 | [Scalar confidence calibrator (Platt)](#px-080) | calibrate | P1 | S | Done | 0.3.0.dev0 |
 | PX-104 | [A generative example capability beside `support.triage`](#px-104) | demo | P1 | S | Done | 0.3.0.dev0 |
-| PX-024 | [OpenAI-compatible local adapter: student, System-1 and teacher](#px-024) | providers | P1 | M | Ready | |
-| PX-028 | [pip extras per adapter, dependencies imported lazily](#px-028) | packaging | P1 | S | Ready | |
+| PX-024 | [OpenAI-compatible local adapter: student, System-1 and teacher](#px-024) | providers | P1 | M | Done | 0.3.0.dev0 |
+| PX-028 | [pip extras per adapter, dependencies imported lazily](#px-028) | packaging | P1 | S | Done | 0.3.0.dev0 |
 
 ### 0.4.0 — trust the data, trust the eval (M2)
 
