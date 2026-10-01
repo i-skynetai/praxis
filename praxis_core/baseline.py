@@ -25,8 +25,10 @@ import json
 import re
 from typing import Iterable, Mapping
 
+from typing import Any
+
 from .confidence import uniform
-from .contracts import DecisionExample, ModelInfo, Question, RawAnswer, State
+from .contracts import DecisionExample, GenerativeAnswer, GenerativeExample, ModelInfo, Question, RawAnswer, State
 from .dataset import label_key
 
 _TOKEN = re.compile(r"[a-z0-9]+")
@@ -88,3 +90,38 @@ class NearestNeighbourDecisionModel:
             n = len(keys)
             out[name] = RawAnswer({k: best * (votes[k] / total) + (1.0 - best) / n for k in keys}, best)
         return out
+
+
+class NearestNeighbourGenerativeModel:
+    """The generative baseline: answer with the output of the most similar captured example,
+    confidence = that similarity. Exactly the original v0.1 student behind the
+    ``GenerativeModel`` port. It copies; it does not extract or compose, which is why it
+    is honest about extraction tasks and why the exemplar rung (PX-111) exists."""
+
+    name = "nearest-neighbour-generative"
+
+    def __init__(self) -> None:
+        self._memory: list[tuple[frozenset[str], Any]] = []
+
+    @property
+    def info(self) -> ModelInfo:
+        return ModelInfo("baseline", self.name, f"examples={len(self._memory)}", "memory")
+
+    @property
+    def fitted(self) -> bool:
+        return bool(self._memory)
+
+    def fit(self, examples: Iterable[GenerativeExample]) -> int:
+        self._memory = [(tokens(e.state), e.output) for e in examples]
+        return len(self._memory)
+
+    def generate(self, state: State, instructions: str, output_schema: Mapping[str, str]) -> GenerativeAnswer:
+        if not self._memory:
+            return GenerativeAnswer(None, 0.0)
+        query = tokens(state)
+        best, best_output = 0.0, None
+        for remembered, output in self._memory:
+            similarity = jaccard(query, remembered)
+            if similarity > best:
+                best, best_output = similarity, output
+        return GenerativeAnswer(best_output, best)

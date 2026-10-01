@@ -64,9 +64,9 @@ accepted.
 |---|---|---|---|---|---|---|
 | PX-100 | [Observe-mode capture: the app's own answer becomes the trace](#px-100) | capture | P0 | M | Done | 0.3.0.dev0 |
 | PX-101 | [Background sink: capture adds no visible latency](#px-101) | trace | P0 | S | Done | 0.3.0.dev0 |
-| PX-070 | [Generative capabilities through the same router](#px-070) | router | P0 | M | Ready | |
-| PX-080 | [Scalar confidence calibrator (Platt)](#px-080) — *good first issue* | calibrate | P1 | S | Ready | |
-| PX-104 | [A generative example capability beside `support.triage`](#px-104) | demo | P1 | S | Needs decision | |
+| PX-070 | [Generative capabilities through the same router](#px-070) | router | P0 | M | Done | 0.3.0.dev0 |
+| PX-080 | [Scalar confidence calibrator (Platt)](#px-080) | calibrate | P1 | S | Done | 0.3.0.dev0 |
+| PX-104 | [A generative example capability beside `support.triage`](#px-104) | demo | P1 | S | Done | 0.3.0.dev0 |
 | PX-024 | [OpenAI-compatible local adapter: student, System-1 and teacher](#px-024) | providers | P1 | M | Ready | |
 | PX-028 | [pip extras per adapter, dependencies imported lazily](#px-028) | packaging | P1 | S | Ready | |
 
@@ -181,9 +181,8 @@ microseconds; the queue is bounded and drops are counted on the router's stats, 
 raised; `flush()` exists for tests and shutdown; a test shows ≤ 5 ms added at p95 over
 1,000 calls. *Starts in:* `praxis_core/trace.py`.
 
-<a id="px-104"></a>**PX-104 — A generative example capability.** *Decision needed:*
-`support.extract` (order id, product and issue from the same tickets; recommended) or a
-`rationale` field on `support.triage` (the original PRD's shape). *Done when:* the demo
+<a id="px-104"></a>**PX-104 — A generative example capability.** *Decided 2026-10-01:*
+`support.extract` (product, issue type and order id from the same tickets). *Done when:* the demo
 runs it through observe mode and the generative router with the fake student and
 teacher, under the same one-second budget.
 

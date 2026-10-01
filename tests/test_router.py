@@ -207,6 +207,14 @@ class ServeAndAbstain(unittest.TestCase):
         router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97))
         self.assertFalse(router.decide_state(TICKET)["department"].calibrated)
 
+    def test_require_calibrated_refuses_an_uncalibrated_question(self):
+        model = FakeDecisionModel(pick=oracle_key, peak=0.97)
+        router, _, _ = make(model, calibrator=FakeCalibrator(fitted=False), policy=RoutingPolicy(0.5, require_calibrated=True))
+        results = router.decide_state(TICKET)
+        self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("uncalibrated") for r in results.values()))
+        router, _, _ = make(model, calibrator=FakeCalibrator(fitted=True), policy=RoutingPolicy(0.5, require_calibrated=True))
+        self.assertTrue(all(r.answered_by == "system1" for r in router.decide_state(TICKET).values()))
+
     def test_score_results_carry_an_expected_value(self):
         router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97))
         r = router.decide_state(TICKET)["urgency"]

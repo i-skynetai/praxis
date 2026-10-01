@@ -33,12 +33,21 @@ class TheDemoStaysGreen(unittest.TestCase):
         self.assertEqual(set(summary.temperatures), {"boolean/2", "choice/4", "score/4"})
         self.assertLessEqual(summary.confident_wrong, summary.served_by_system1)
         self.assertTrue(any(line.startswith("loop closed in") for line in lines))
+        self.assertEqual([s.stage for s in summary.extract_stages], ["observe", "shadow-warm", "canary-50%", "serve"])
+        self.assertEqual(summary.extract_trace_count, 240)
+        self.assertEqual(summary.extract_examples, 60)
+        self.assertLessEqual(summary.extract_confident_wrong, summary.extract_served_by_system1)
+        self.assertTrue(any("support.extract" in line for line in lines))
+        self.assertTrue(summary.verdict.startswith("ready for canary"), summary.verdict)
+        self.assertTrue(summary.extract_verdict.startswith("stays in shadow"), summary.extract_verdict)
+        self.assertEqual(summary.extract_served_by_system1, 0, "nothing is served without a fitted calibrator")
 
     def test_it_is_deterministic_for_a_seed(self):
         a, b = run_demo(out=None).as_dict(), run_demo(out=None).as_dict()
-        for stage_a, stage_b in zip(a["stages"], b["stages"]):
-            stage_a.pop("elapsed_ms"); stage_b.pop("elapsed_ms")
-        a.pop("elapsed_ms"); b.pop("elapsed_ms")
+        for d in (a, b):
+            d.pop("elapsed_ms")
+            for stage in d["stages"] + d["extract"]["stages"]:
+                stage.pop("elapsed_ms")
         self.assertEqual(a, b)
 
     def test_the_module_entry_point_runs_with_nothing_installed(self):
@@ -59,7 +68,8 @@ class TheDemoStaysGreen(unittest.TestCase):
                                    "--jsonl", str(path)], cwd=ROOT, capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             summary = json.loads(proc.stdout)
-            self.assertEqual(len(path.read_text().splitlines()), summary["trace_count"])
+            self.assertEqual(len(path.read_text().splitlines()),
+                             summary["trace_count"] + summary["extract"]["trace_count"])
 
     def test_version_flag(self):
         proc = subprocess.run([sys.executable, "-m", "praxis_core", "--version"], cwd=ROOT, capture_output=True, text=True)
@@ -72,6 +82,18 @@ class TheTrafficAndTheTeacherAreHonest(unittest.TestCase):
         a, b = TicketGenerator(3).tickets(20), TicketGenerator(3).tickets(20)
         self.assertEqual(a, b)
         self.assertGreater(len({t["body"] for t in a}), 15)
+
+    def test_the_extract_teacher_reads_the_ticket(self):
+        from praxis_core.demo import PRODUCTS, extract_rule_teacher, support_extract
+        cap = support_extract()
+        seen_products, seen_orders, seen_issues = set(), 0, set()
+        for ticket in TicketGenerator(11).tickets(200):
+            out = extract_rule_teacher(ticket, cap.instructions, cap.output_schema)
+            self.assertEqual(set(out), set(cap.output_schema))
+            seen_products.add(out["product"]); seen_issues.add(out["issue"]); seen_orders += bool(out["order_id"])
+        self.assertEqual(seen_products, set(PRODUCTS) | {""})
+        self.assertGreater(seen_orders, 50)
+        self.assertNotIn("", seen_issues, "every generated phrase has an issue tag")
 
     def test_the_teacher_reads_the_ticket_and_covers_every_answer(self):
         cap = support_triage()

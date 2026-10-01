@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from .contracts import Capability, DecisionExample, Question, TraceEvent
+from .contracts import Capability, DecisionExample, GenerativeExample, Question, TraceEvent
 
 
 def label_key(example: DecisionExample) -> str:
@@ -74,4 +74,35 @@ def examples_from_traces(traces: Iterable[TraceEvent], capability: Capability | 
                 {"trace_id": trace.trace_id, "host_partition": trace.host_partition, "source": trace.source,
                  "dataset_version": dataset_version, "question_hash": q.options_or_levels_hash}))
             report["examples"] += 1
+    return examples, report
+
+
+def generative_examples_from_traces(traces: Iterable[TraceEvent], capability: Capability | None = None,
+                                    dataset_version: str | None = None) -> tuple[list[GenerativeExample], dict[str, int]]:
+    """Labelled examples for a generative student from traces that carry a System-2 output."""
+    report = {"traces": 0, "examples": 0, "skipped_not_label_candidate": 0, "skipped_no_system2_output": 0,
+              "skipped_hash_mismatch": 0, "skipped_other_capability": 0, "skipped_not_distillable": 0}
+    examples: list[GenerativeExample] = []
+    for trace in traces:
+        report["traces"] += 1
+        if capability is not None and trace.capability != capability.name:
+            report["skipped_other_capability"] += 1
+            continue
+        if not trace.label_candidate:
+            report["skipped_not_label_candidate"] += 1
+            continue
+        if not trace.teacher_distillable:
+            report["skipped_not_distillable"] += 1
+            continue
+        if capability is not None and trace.capability_hash != capability.definition_hash:
+            report["skipped_hash_mismatch"] += 1
+            continue
+        g = trace.generation
+        if g is None or g.system2_output is None:
+            report["skipped_no_system2_output"] += 1
+            continue
+        examples.append(GenerativeExample(trace.capability, trace.state, g.system2_output, "system2",
+                                          {"trace_id": trace.trace_id, "host_partition": trace.host_partition,
+                                           "source": trace.source, "dataset_version": dataset_version}))
+        report["examples"] += 1
     return examples, report

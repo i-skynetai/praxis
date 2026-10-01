@@ -156,19 +156,82 @@ class FakeTeacher:
         return question.answer_for(question.keys()[0])
 
 
+#: ``(state, instructions, output_schema) -> output``: how a fake generative model answers.
+Generator = Callable[[State, str, Mapping[str, str]], Any]
+
+GENERATIVE_MALFORMED_MODES: tuple[str, ...] = (
+    "not-an-answer", "invalid-output", "nan-confidence", "confidence-above-one", "none-output",
+)
+
+
 class FakeGenerativeModel:
-    def __init__(self, output: Any = None, confidence: float = 0.9, info: ModelInfo | None = None) -> None:
-        self.output = output
+    """A generative student or teacher that answers by a rule, or misbehaves on request.
+
+    ``generate_fn`` produces the output (default: empty strings for every schema field);
+    ``confidence`` is what it reports; ``fail``, ``delay_s`` and ``malformed`` inject faults
+    exactly as ``FakeDecisionModel`` does.
+    """
+
+    def __init__(self, generate_fn: Generator | None = None, confidence: float = 0.9, *,
+                 fail: BaseException | None = None, delay_s: float = 0.0, malformed: str | None = None,
+                 cost_usd: float = 0.0, info: ModelInfo | None = None) -> None:
+        if malformed is not None and malformed not in GENERATIVE_MALFORMED_MODES:
+            raise ValueError(f"malformed must be one of {GENERATIVE_MALFORMED_MODES}")
+        self.generate_fn = generate_fn
         self.confidence = confidence
+        self.fail = fail
+        self.delay_s = delay_s
+        self.malformed = malformed
+        self.cost_usd = cost_usd
         self._info = info or ModelInfo("fake", "fake-generative", "0")
+        self.calls = 0
 
     @property
     def info(self) -> ModelInfo:
         return self._info
 
     def generate(self, state: State, instructions: str, output_schema: Mapping[str, str]) -> GenerativeAnswer:
-        return GenerativeAnswer(self.output if self.output is not None else {k: "" for k in output_schema},
-                                self.confidence)
+        self.calls += 1
+        if self.delay_s:
+            time.sleep(self.delay_s)
+        if self.fail is not None:
+            raise self.fail
+        if self.malformed == "not-an-answer":
+            return {"output": "x"}  # type: ignore[return-value]
+        if self.malformed == "invalid-output":
+            return GenerativeAnswer({"smuggled": 1}, self.confidence)
+        if self.malformed == "none-output":
+            return GenerativeAnswer(None, self.confidence)
+        output = self.generate_fn(state, instructions, output_schema) if self.generate_fn else {k: "" for k in output_schema}
+        if self.malformed == "nan-confidence":
+            return GenerativeAnswer(output, float("nan"))
+        if self.malformed == "confidence-above-one":
+            return GenerativeAnswer(output, 1.7)
+        return GenerativeAnswer(output, self.confidence, self.cost_usd)
+
+
+class FakeScalarCalibrator:
+    """Identity on a scalar; ``fitted`` controls the flag."""
+
+    def __init__(self, fitted: bool = False, version: str = "fake-scalar-calibrator") -> None:
+        self.fitted = fitted
+        self._version = version
+        self.fit_calls = 0
+
+    @property
+    def version(self) -> str:
+        return self._version
+
+    def fit(self, traces: Sequence[TraceEvent]) -> Mapping[str, float]:
+        self.fit_calls += 1
+        self.fitted = True
+        return {}
+
+    def apply(self, confidence: float) -> float:
+        return float(confidence)
+
+    def is_fitted(self) -> bool:
+        return self.fitted
 
 
 class FakeCalibrator:

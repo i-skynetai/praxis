@@ -16,6 +16,11 @@ traces (Rung A of the training ladder, plan §3.6).
 A distribution whose (type, option count) has not been fitted passes through unchanged
 and is reported as ``calibrated = False``, so a threshold applied to it is applied to the
 provider's own scale, and the trace says so.
+
+For a student that reports **one number** (a generative student's self-reported
+confidence) the sibling is ``PlattCalibrator``: a two-parameter logistic fit,
+``p = sigmoid(a · logit(c) + b)``, on (confidence, matched the label) pairs, solved by
+Newton's method with a little ridge so a perfectly separable sample cannot blow up.
 """
 from __future__ import annotations
 
@@ -152,3 +157,128 @@ class TemperatureCalibrator:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TemperatureCalibrator:
         return cls(int(data.get("min_examples", 10)), dict(data.get("temperatures") or {}))
+
+
+# ------------------------------------------------------------------ scalar scores
+
+def sigmoid(x: float) -> float:
+    if x >= 0:
+        return 1.0 / (1.0 + math.exp(-x))
+    e = math.exp(x)
+    return e / (1.0 + e)
+
+
+def logit(p: float, eps: float = 1e-6) -> float:
+    p = min(1.0 - eps, max(eps, p))
+    return math.log(p / (1.0 - p))
+
+
+def _platt_nll(xs: Sequence[float], ys: Sequence[float], a: float, b: float, ridge: float) -> float:
+    total = 0.5 * ridge * ((a - 1.0) ** 2 + b * b)
+    for x, y in zip(xs, ys):
+        z = a * x + b
+        # log(1 + exp(z)) computed stably, minus y*z
+        total += (max(z, 0.0) + math.log1p(math.exp(-abs(z)))) - y * z
+    return total
+
+
+def fit_platt(pairs: Sequence[tuple[float, bool]], ridge: float = 1e-3, iterations: int = 100) -> tuple[float, float]:
+    """Logistic regression of "matched" on logit(confidence) with an intercept: returns (a, b).
+
+    Damped Newton: each step is halved until the (ridge-regularised) negative
+    log-likelihood goes down, so a saturated start cannot send the slope to infinity."""
+    xs = [logit(c) for c, _ in pairs]
+    ys = [1.0 if ok else 0.0 for _, ok in pairs]
+    a, b = 1.0, 0.0
+    current = _platt_nll(xs, ys, a, b, ridge)
+    for _ in range(iterations):
+        g_a = ridge * (a - 1.0)
+        g_b = ridge * b
+        h_aa, h_ab, h_bb = ridge, 0.0, ridge
+        for x, y in zip(xs, ys):
+            p = sigmoid(a * x + b)
+            w = p * (1.0 - p)
+            g_a += (p - y) * x
+            g_b += (p - y)
+            h_aa += w * x * x
+            h_ab += w * x
+            h_bb += w
+        det = h_aa * h_bb - h_ab * h_ab
+        if det <= 1e-12:
+            break
+        da = (h_bb * g_a - h_ab * g_b) / det
+        db = (h_aa * g_b - h_ab * g_a) / det
+        step = 1.0
+        improved = False
+        for _ in range(30):
+            na, nb = a - step * da, b - step * db
+            candidate = _platt_nll(xs, ys, na, nb, ridge)
+            if candidate < current:
+                a, b, current, improved = na, nb, candidate, True
+                break
+            step *= 0.5
+        if not improved or (abs(step * da) < 1e-9 and abs(step * db) < 1e-9):
+            break
+    return a, b
+
+
+class PlattCalibrator:
+    """The ``ScalarCalibrator`` port: one logistic map from a raw confidence to P(matched)."""
+
+    name = "platt"
+
+    def __init__(self, min_examples: int = 10, a: float | None = None, b: float | None = None) -> None:
+        self.min_examples = min_examples
+        self._params: tuple[float, float] | None = None if a is None or b is None else (a, b)
+        self._skipped = 0
+
+    @property
+    def version(self) -> str:
+        if self._params is None:
+            return f"{self.name}-v1/unfitted"
+        return f"{self.name}-v1/{stable_hash(self.parameters())}"
+
+    def parameters(self) -> dict[str, float]:
+        return {} if self._params is None else {"a": self._params[0], "b": self._params[1]}
+
+    @property
+    def skipped(self) -> int:
+        """Usable pairs found in the last ``fit`` when it was below ``min_examples`` (else 0)."""
+        return self._skipped
+
+    @staticmethod
+    def pairs_from(traces: Sequence[TraceEvent]) -> list[tuple[float, bool]]:
+        pairs: list[tuple[float, bool]] = []
+        for trace in traces:
+            g = trace.generation
+            if g is None or g.native_confidence is None or g.matched is None:
+                continue
+            pairs.append((float(g.native_confidence), bool(g.matched)))
+        return pairs
+
+    def fit(self, traces: Sequence[TraceEvent]) -> Mapping[str, float]:
+        pairs = self.pairs_from(traces)
+        if len(pairs) < self.min_examples or len({ok for _, ok in pairs}) < 2:
+            self._skipped = len(pairs)
+            return self.parameters()
+        self._skipped = 0
+        self._params = fit_platt(pairs)
+        return self.parameters()
+
+    def apply(self, confidence: float) -> float:
+        c = min(1.0, max(0.0, float(confidence)))
+        if self._params is None:
+            return c
+        a, b = self._params
+        return sigmoid(a * logit(c) + b)
+
+    def is_fitted(self) -> bool:
+        return self._params is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "min_examples": self.min_examples, **self.parameters()}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> PlattCalibrator:
+        a, b = data.get("a"), data.get("b")
+        return cls(int(data.get("min_examples", 10)), None if a is None else float(a), None if b is None else float(b))

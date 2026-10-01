@@ -78,11 +78,11 @@ class BothSinksRoundTrip(unittest.TestCase):
         path = pathlib.Path(self.tmp.name) / "demo.jsonl"
         summary = run_demo(tickets=10, sink=JsonlTraceSink(path), out=None)
         lines = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-        self.assertEqual(len(lines), summary.trace_count)
+        self.assertEqual(len(lines), summary.trace_count + summary.extract_trace_count)
         self.assertTrue(all(line["envelope_version"] == 2 for line in lines))
         with SqliteTraceSink(pathlib.Path(self.tmp.name) / "demo.db") as db:
             summary = run_demo(tickets=10, sink=db, out=None)
-            self.assertEqual(db.count(), summary.trace_count)
+            self.assertEqual(db.count(), summary.trace_count + summary.extract_trace_count)
 
 
 class TheBackgroundSinkCostsTheCallerNothing(unittest.TestCase):

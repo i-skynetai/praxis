@@ -335,6 +335,10 @@ class Capability:
         return DecisionRequest(self.name, state, dict(questions if questions is not None else self.questions),
                                context or RequestContext())
 
+    def generative_request(self, state: State, context: RequestContext | None = None) -> GenerativeRequest:
+        """A request against a generative capability: the state, the declared instructions and schema."""
+        return GenerativeRequest(self.name, state, context or RequestContext())
+
     def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "kind": self.kind,
                 "questions": {name: q.to_dict() for name, q in self.questions.items()},
@@ -411,6 +415,24 @@ class DecisionRequest:
                    RequestContext.from_dict(data.get("context") or {}))
 
 
+@dataclass(frozen=True)
+class GenerativeRequest:
+    """A request against a generative capability. The instructions and the output schema
+    come from the capability; the request carries what the decision is about."""
+
+    capability: str
+    state: State
+    context: RequestContext = field(default_factory=RequestContext)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"capability": self.capability, "state": self.state, "context": self.context.to_dict()}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> GenerativeRequest:
+        return cls(str(data["capability"]), _state_from_json(data["state"]),
+                   RequestContext.from_dict(data.get("context") or {}))
+
+
 # ------------------------------------------------------------------------- Result
 
 @dataclass(frozen=True)
@@ -473,6 +495,44 @@ class DecisionResult:
                    str(data["provider"]), str(data["model"]), str(data.get("version", "")), str(data.get("level", "")),
                    float(data["latency_ms"]), float(data.get("cost_usd", 0.0)), str(data["trace_id"]),
                    _optional_float(data.get("expected_value")), str(data.get("reason", "")))
+
+
+@dataclass(frozen=True)
+class GenerativeResult:
+    """One answered generative call. The same fields as a DecisionResult where they apply,
+    plus ``schema_valid``: whether the served output passed the capability's validator."""
+
+    output: Any
+    confidence: float
+    native_confidence: float | None
+    calibrated: bool
+    abstain: bool
+    answered_by: AnsweredBy
+    provider: str
+    model: str
+    version: str
+    level: str
+    latency_ms: float
+    cost_usd: float
+    trace_id: str
+    schema_valid: bool = True
+    reason: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"output": self.output, "confidence": self.confidence, "native_confidence": self.native_confidence,
+                "calibrated": self.calibrated, "abstain": self.abstain, "answered_by": self.answered_by,
+                "provider": self.provider, "model": self.model, "version": self.version, "level": self.level,
+                "latency_ms": self.latency_ms, "cost_usd": self.cost_usd, "trace_id": self.trace_id,
+                "schema_valid": self.schema_valid, "reason": self.reason}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> GenerativeResult:
+        return cls(data.get("output"), float(data["confidence"]), _optional_float(data.get("native_confidence")),
+                   bool(data["calibrated"]), bool(data["abstain"]),
+                   cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")),
+                   str(data["provider"]), str(data["model"]), str(data.get("version", "")), str(data.get("level", "")),
+                   float(data["latency_ms"]), float(data.get("cost_usd", 0.0)), str(data["trace_id"]),
+                   bool(data.get("schema_valid", True)), str(data.get("reason", "")))
 
 
 # ------------------------------------------------------------- adapter return types
@@ -566,7 +626,62 @@ class DecisionExample:
                    _optional_distribution(data.get("teacher_distribution")), dict(data.get("meta") or {}))
 
 
+@dataclass(frozen=True)
+class GenerativeExample:
+    """One labelled example for a generative student: a state and the output to learn."""
+
+    capability: str
+    state: State
+    output: Any
+    label_source: LabelSource = "system2"
+    meta: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"capability": self.capability, "state": self.state, "output": self.output,
+                "label_source": self.label_source, "meta": dict(self.meta)}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> GenerativeExample:
+        return cls(str(data["capability"]), _state_from_json(data["state"]), data.get("output"),
+                   cast(LabelSource, _literal(data.get("label_source", "system2"), LABEL_SOURCES, "label_source")),
+                   dict(data.get("meta") or {}))
+
+
 # ------------------------------------------------------------------ Trace envelope
+
+@dataclass
+class GenerationTrace:
+    """The generative part of the envelope: both outputs, validity, confidence, and whether
+    the two agreed. ``matched`` is None unless both outputs exist."""
+
+    answered_by: AnsweredBy
+    abstain: bool
+    output: Any = None
+    system1_output: Any = None
+    system2_output: Any = None
+    schema_valid: bool | None = None
+    confidence: float | None = None
+    native_confidence: float | None = None
+    calibrator_version: str | None = None
+    matched: bool | None = None
+    reason: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"answered_by": self.answered_by, "abstain": self.abstain, "output": self.output,
+                "system1_output": self.system1_output, "system2_output": self.system2_output,
+                "schema_valid": self.schema_valid, "confidence": self.confidence,
+                "native_confidence": self.native_confidence, "calibrator_version": self.calibrator_version,
+                "matched": self.matched, "reason": self.reason}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> GenerationTrace:
+        matched = data.get("matched")
+        valid = data.get("schema_valid")
+        return cls(cast(AnsweredBy, _literal(data["answered_by"], ANSWERED_BY, "answered_by")), bool(data["abstain"]),
+                   data.get("output"), data.get("system1_output"), data.get("system2_output"),
+                   None if valid is None else bool(valid), _optional_float(data.get("confidence")),
+                   _optional_float(data.get("native_confidence")), _optional_str(data.get("calibrator_version")),
+                   None if matched is None else bool(matched), str(data.get("reason", "")))
 
 @dataclass
 class QuestionTrace:
@@ -651,6 +766,7 @@ class TraceEvent:
     dataset_version: str | None = None
     pii_redacted: bool = False
     schema_valid: bool | None = None
+    generation: GenerationTrace | None = None
     host_partition: str | None = None
     caller: str | None = None
     outcome: dict[str, Any] | None = None
@@ -667,12 +783,14 @@ class TraceEvent:
                 return q
         raise KeyError(name)
 
-    def to_request(self) -> DecisionRequest:
+    def to_request(self) -> DecisionRequest | GenerativeRequest:
         """Rebuild the request this trace recorded: the replay-equivalence property.
         The state, every question as presented, and the host partition and caller are
         carried; a budget and the opaque ``extra`` are not part of what a model saw."""
-        return DecisionRequest(self.capability, self.state, {q.name: q.question for q in self.questions},
-                               RequestContext(host_partition=self.host_partition, caller=self.caller))
+        context = RequestContext(host_partition=self.host_partition, caller=self.caller)
+        if self.capability_kind == "generative":
+            return GenerativeRequest(self.capability, self.state, context)
+        return DecisionRequest(self.capability, self.state, {q.name: q.question for q in self.questions}, context)
 
     def to_dict(self) -> dict[str, Any]:
         return {"envelope_version": self.envelope_version, "trace_id": self.trace_id,
@@ -688,6 +806,7 @@ class TraceEvent:
                 "source": self.source, "mode": self.mode, "label_candidate": self.label_candidate,
                 "teacher_distillable": self.teacher_distillable, "dataset_version": self.dataset_version,
                 "pii_redacted": self.pii_redacted, "schema_valid": self.schema_valid,
+                "generation": None if self.generation is None else self.generation.to_dict(),
                 "questions": [q.to_dict() for q in self.questions],
                 "host_partition": self.host_partition, "caller": self.caller,
                 "state": self.state, "outcome": self.outcome, "feedback": self.feedback}
@@ -699,6 +818,7 @@ class TraceEvent:
             raise ValueError(f"trace envelope version {version} is not readable by this Praxis (wants {ENVELOPE_VERSION})")
         system1, system2 = data.get("system1"), data.get("system2")
         outcome, feedback = data.get("outcome"), data.get("feedback")
+        generation = data.get("generation")
         return cls(
             trace_id=str(data["trace_id"]), capability=str(data["capability"]),
             capability_kind=cast(CapabilityKind, _literal(data["capability_kind"], CAPABILITY_KINDS, "capability_kind")),
@@ -724,6 +844,7 @@ class TraceEvent:
             dataset_version=_optional_str(data.get("dataset_version")),
             pii_redacted=bool(data.get("pii_redacted", False)),
             schema_valid=None if data.get("schema_valid") is None else bool(data["schema_valid"]),
+            generation=None if generation is None else GenerationTrace.from_dict(generation),
             host_partition=_optional_str(data.get("host_partition")), caller=_optional_str(data.get("caller")),
             outcome=None if outcome is None else dict(outcome), feedback=None if feedback is None else dict(feedback))
 
@@ -738,3 +859,20 @@ class TraceEvent:
 def is_finite(value: object) -> bool:
     """True for a real, finite number (bools excluded)."""
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def normalise_output(value: Any) -> Any:
+    """The default notion of "the same output": strings stripped and case-folded, numbers as
+    they are, mappings compared as mappings, lists in order. Hosts with a looser notion
+    pass their own match function to the generative router."""
+    if isinstance(value, str):
+        return " ".join(value.split()).casefold()
+    if isinstance(value, Mapping):
+        return {str(k): normalise_output(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [normalise_output(v) for v in value]
+    return value
+
+
+def outputs_match(a: Any, b: Any) -> bool:
+    return bool(normalise_output(a) == normalise_output(b))

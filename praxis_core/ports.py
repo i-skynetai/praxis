@@ -14,7 +14,7 @@ What each port is for, in one line:
 * ``Teacher``  System-2. Same request in, a typed answer per question out, via whatever
   structured-output mechanism the provider has. Permanent: never removed from the loop.
 * ``Calibrator``  Puts every provider's raw distribution on one scale so a threshold means
-  the same thing everywhere.
+  the same thing everywhere. ``ScalarCalibrator`` is its sibling for a single score.
 * ``Trainer``  Turns a decision dataset into a model artifact. Rung A (temperature refit)
   to Rung D (LoRA) all sit behind this.
 * ``TraceSink``  Persists traces and reads them back. Recording must never raise into
@@ -98,6 +98,23 @@ class Calibrator(Protocol):
     def apply(self, question: Question, distribution: Mapping[str, float]) -> Distribution: ...
 
     def is_fitted(self, question: Question) -> bool: ...
+
+
+@runtime_checkable
+class ScalarCalibrator(Protocol):
+    """The sibling of ``Calibrator`` for students that report one number, not a
+    distribution: generative students. Maps a raw confidence onto a probability of being
+    right, fitted on traces that carry both the raw confidence and whether the output
+    matched the System-2 one."""
+
+    @property
+    def version(self) -> str: ...
+
+    def fit(self, traces: Sequence[TraceEvent]) -> Mapping[str, float]: ...
+
+    def apply(self, confidence: float) -> float: ...
+
+    def is_fitted(self) -> bool: ...
 
 
 @runtime_checkable
