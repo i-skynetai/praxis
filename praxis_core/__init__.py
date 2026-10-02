@@ -9,9 +9,8 @@ identical inputs, and serves it by confidence with the main model as the permane
 fallback. Every call leaves a trace.
 
 Distribution ``praxis-core``, import ``praxis_core``, command ``praxis``. The contracts
-and the ports live at the top of this package; adapters in ``praxis_core.providers``;
-the original v0.1 modules in ``praxis_core.legacy`` until their replacements land.
-``python -m praxis_core demo`` runs the whole loop with nothing installed.
+and the ports live at the top of this package, adapters in ``praxis_core.providers``.
+``python3 -m praxis_core demo`` runs the whole loop with nothing installed.
 """
 
 from praxis_core.contracts import (

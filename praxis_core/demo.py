@@ -401,7 +401,10 @@ def run_demo(
     try:
         router.set_stage("canary")  # 3. half the calls may be served, if the verdict allows
     except NotReady as exc:
-        say(f"canary: refused, {exc.readiness.verdict}; the loop stops here for {capability.name}")
+        say(
+            f"canary: refused by the readiness gate ({len(exc.readiness.missing)} missing); "
+            f"{capability.name} stays in shadow"
+        )
     else:
         summary.promoted = True
         show(_run_stage(router, generator, tickets, "canary-50%"))
@@ -456,14 +459,16 @@ def run_demo(
         f"{summary.trace_count + summary.extract_trace_count} traces recorded; the trace path raised into the "
         f"caller {router.stats.trace_failures} times"
     )
-    steps = "capture -> label -> fit -> calibrate -> canary -> serve"
-    closed = [n for n, ok in ((capability.name, summary.promoted), (EXTRACT_NAME, summary.extract_promoted)) if ok]
-    stopped = [n for n, ok in ((capability.name, summary.promoted), (EXTRACT_NAME, summary.extract_promoted)) if not ok]
+    outcomes = ((capability.name, summary.promoted), (EXTRACT_NAME, summary.extract_promoted))
+    closed = " and ".join(name for name, ok in outcomes if ok)
+    stopped = " and ".join(name for name, ok in outcomes if not ok)
+    ms = f"{summary.elapsed_ms:.0f} ms"
     if closed:
-        tail = f"; {' and '.join(stopped)} stopped at the readiness gate" if stopped else ""
-        say(f"loop closed in {summary.elapsed_ms:.0f} ms: {steps} for {' and '.join(closed)}{tail}. The teacher stays.")
+        say(f"loop closed in {ms} for {closed}: capture -> label -> fit -> calibrate -> canary -> serve")
+    if stopped:
+        say(f"{stopped} stopped at the readiness gate{'' if closed else f' in {ms}'}. The teacher stays.")
     else:
-        say(f"loop stopped at the readiness gate in {summary.elapsed_ms:.0f} ms for both kinds. The teacher stays.")
+        say("The teacher stays.")
     return summary
 
 
@@ -551,7 +556,10 @@ def _run_extract(
     try:
         router.set_stage("canary")
     except NotReady as exc:
-        say(f"canary: refused, {exc.readiness.verdict}; the loop stops here for {capability.name}")
+        say(
+            f"canary: refused by the readiness gate ({len(exc.readiness.missing)} missing); "
+            f"{capability.name} stays in shadow"
+        )
     else:
         summary.extract_promoted = True
         stage("canary-50%")
@@ -568,7 +576,4 @@ def _run_extract(
             f"disagreed on {summary.extract_confident_wrong} (confident-wrong)"
         )
     else:
-        say(
-            "nothing was served: a student that copies its nearest neighbour cannot extract, the verdict says "
-            "so, and the router refused to move past shadow instead of serving it"
-        )
+        say("served by System-1: 0. A student that copies its nearest neighbour cannot extract; the gate kept it out.")

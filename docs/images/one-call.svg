@@ -68,7 +68,7 @@
   <rect x="40" y="410" width="880" height="62" rx="6" fill="#f7f7f7" stroke="#888" stroke-width="1.5"/>
   <text x="480" y="433" text-anchor="middle" font-weight="bold" fill="#222">Underneath every call</text>
   <text x="480" y="452" text-anchor="middle" fill="#333" font-size="13">a trace with both answers, the confidence and the reason · a student error, timeout or malformed answer is an abstention, never an exception</text>
-  <text x="480" y="467" text-anchor="middle" fill="#333" font-size="13">a dead trace store is counted, not raised · with require_calibrated, nothing is served until a calibrator was fitted in shadow</text>
+  <text x="480" y="467" text-anchor="middle" fill="#333" font-size="13">a dead trace store is counted, not raised · by default, nothing is served until a calibrator was fitted in shadow</text>
 
   <text x="480" y="512" text-anchor="middle" fill="#666" font-size="13">shadow: the main model always serves, the student is only compared · canary: a share of calls · serve: every sure, valid answer</text>
   <defs>

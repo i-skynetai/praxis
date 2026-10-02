@@ -43,13 +43,11 @@ include = ["praxis_core*"]
 python_version = "3.11"
 strict = true
 files = ["praxis_core"]
-exclude = '^praxis_core/legacy/'
 warn_unreachable = true
 
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-extend-exclude = ["praxis_core/legacy"]
 
 [tool.ruff.lint]
 # E/W style, F pyflakes, I import order, UP modern syntax, B likely bugs, SIM simplifications.

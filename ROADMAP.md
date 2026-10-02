@@ -30,7 +30,7 @@ worth splitting.
 1. **Choose a `Ready` row.** New here? Take one marked *good first issue*.
 2. **Claim it.** Open an issue with the *Claim a feature* template naming the ID, or
    comment on the feature's issue if one exists. A maintainer confirms within a few days.
-3. **Mark it `In progress`** in this file — your handle and the date in the Owner
+3. **Mark it `In progress`** in this file — your handle and the date in the last
    column — in your first pull request, or in a one-line pull request of its own.
 4. **For an L-sized feature, write a design note first**, from
    [the template](docs/features/TEMPLATE.md), and get it agreed on the issue before the
@@ -49,7 +49,7 @@ accepted.
 
 ### 0.2.0 — the redesign lands (done)
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-001 | [Contracts: typed questions, request, result, envelope v2, seven ports](#px-001) | core | P0 | M | Done | 0.2.0.dev0 |
 | PX-002 | [Router with abstain, shadow and canary; the trace path never raises](#px-002) | router | P0 | M | Done | 0.2.0.dev0 |
@@ -60,7 +60,7 @@ accepted.
 
 ### 0.3.0 — capture, and both capability kinds (M1)
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-100 | [Observe-mode capture: the app's own answer becomes the trace](#px-100) | capture | P0 | M | Done | 0.3.0 |
 | PX-101 | [Background sink: capture adds no visible latency](#px-101) | trace | P0 | S | Done | 0.3.0 |
@@ -74,15 +74,15 @@ accepted.
 
 Found by the first outside review of the committed tree (2026-10-01). One row at a time.
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-900 | [Safe by default: shadow stage, calibration required](#px-900) | router | P0 | S | Done | 0.3.2 |
 | PX-901 | [Readiness gate: `set_stage` refuses canary and serve until the verdict is ready](#px-901) | router | P1 | S | Done | 0.3.2 |
-| PX-902 | [Remove the v0.1 modules; docs match the code; the demo picture is real output](#px-902) | docs | P1 | S | Ready | |
+| PX-902 | [Remove the v0.1 modules; docs match the code; the demo picture is real output](#px-902) | docs | P1 | S | Done | 0.3.2 |
 
 ### 0.4.0 — trust the data, trust the eval (M2)
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-040 | [Gate checks for decision traces](#px-040) | gate | P1 | S | Ready | |
 | PX-041 | [Decision dataset builder: split, decontamination report, manifest](#px-041) | data | P1 | L | Ready | |
@@ -94,7 +94,7 @@ Found by the first outside review of the committed tree (2026-10-01). One row at
 
 ### 0.5.0 — registry, promotion, status (M3)
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-044 | [Local JSON registry, `praxis promote` and `praxis rollback`](#px-044) | registry | P1 | M | Ready | |
 | PX-110 | [`praxis status`: funnel, readiness verdict, offload share, capacity](#px-110) | cli | P0 | M | Ready | |
@@ -104,7 +104,7 @@ Found by the first outside review of the committed tree (2026-10-01). One row at
 
 ### 0.6.0 — students and training rungs A and B (M4)
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-020 | [Apple-Silicon decision-model adapter (`laya-mlx`)](#px-020) | providers | P1 | M | Ready | |
 | PX-042 | [`temperature-refit` trainer](#px-042) — *good first issue* | train | P1 | S | Ready | |
@@ -114,7 +114,7 @@ Found by the first outside review of the committed tree (2026-10-01). One row at
 
 ### 1.0.0 — release (M5)
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-120 | [Host integration guide: capture from your app in ten lines](#px-120) | docs | P0 | S | Ready | |
 | PX-121 | [CLI reference and README for 1.0](#px-121) | docs | P1 | S | Ready | |
@@ -125,7 +125,7 @@ Found by the first outside review of the committed tree (2026-10-01). One row at
 
 ### After 1.0
 
-| ID | Feature | Area | P | Size | Status | Owner |
+| ID | Feature | Area | P | Size | Status | Owner, or release when done |
 |---|---|---|---|---|---|---|
 | PX-071 | [LoRA trainer for generative students (`mlx-lm`, then `peft`)](#px-071) | train | P1 | L | Ready | |
 | PX-050 | [Fine-tune trainer for the decision model, then recalibration](#px-050) | train | P2 | L | Needs decision | |
@@ -306,8 +306,8 @@ an adapter without its extra raises a message naming the extra to install.
 
 ### 0.4.0 — trust the data, trust the eval
 
-<a id="px-030"></a>**PX-030 — Decision scorecard.** Today `praxis_core/legacy/evaluate.py` scores the
-generative student only. *Done when:* per capability and per question type, accuracy
+<a id="px-030"></a>**PX-030 — Decision scorecard.** Today there is no scorecard: the
+demo counts confident-wrong itself, and nothing compares two students on the same inputs. *Done when:* per capability and per question type, accuracy
 against the System-2 label is paired with McNemar's test and a bootstrap confidence
 interval; two runs on the same inputs are identical. *Starts in:*
 `praxis_core/evaluate.py`, standard library only.
@@ -331,8 +331,9 @@ calibration error above 0.10 blocks raising the share) are applied and reported.
 
 ### Data, registry and training rungs
 
-<a id="px-040"></a>**PX-040 — Gate checks for decision traces.** The four-check gate in
-`praxis_core/legacy/gate.py` knows only generative traces. *Done when:* a decision trace is refused
+<a id="px-040"></a>**PX-040 — Gate checks for decision traces.** Today the dataset builder
+skips traces by reason (not a label candidate, no System-2 answer, question hash
+mismatch, other capability), but no gate checks a trace's content before it is used. *Done when:* a decision trace is refused
 when the answer is outside the declared set, the distribution does not sum to one, or
 the question hash does not match the capability, each with a counted reason; outcome
 and feedback labels, when present, outrank the System-2 label.
@@ -443,7 +444,7 @@ never the reverse. Blocked until that host's interface exists.
 ladder: fine-tune a small base on the dataset with `mlx-lm` on Apple Silicon, then
 `peft` elsewhere; serve the adapter through the OpenAI-compatible adapter. The first
 feature after 1.0, because it needs GPU time and a serving step, and the loop is proven
-without it. `LoraStudent.fit` stops raising. See [docs/distillation.md](docs/distillation.md).
+without it. Design note: [docs/features/PX-071-lora-trainer.md](docs/features/PX-071-lora-trainer.md).
 
 <a id="px-072"></a>**PX-072 — Async entry point.** `decide()` is synchronous and bounds
 System-1 with a thread. *Done when:* `adecide()` awaits async adapters end to end with

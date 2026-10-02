@@ -42,7 +42,7 @@ jobs:
           python -m ruff format --check praxis_core tests
 
   typecheck:
-    # mypy --strict on praxis_core (legacy excluded). mypy is a development
+    # mypy --strict on all of praxis_core. mypy is a development
     # dependency only; nothing at runtime needs it.
     runs-on: ubuntu-latest
     steps:

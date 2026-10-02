@@ -338,7 +338,7 @@ class TheCoreIsStandardLibraryOnly(unittest.TestCase):
 
     @staticmethod
     def _core_files() -> list[pathlib.Path]:
-        """Every module of the package except the adapters: the top level, legacy, and later learning."""
+        """Every module of the package except the adapters."""
         files = [p for p in (ROOT / "praxis_core").rglob("*.py") if "providers" not in p.parts]
         assert len(files) >= 10, "the package tree moved; this gate would be vacuous"
         return files

@@ -42,7 +42,7 @@ the big model.
 ```bash
 git clone https://github.com/arupmmi07/praxis.git
 cd praxis
-python -m praxis_core demo
+python3 -m praxis_core demo
 ```
 
 ![The demo](docs/images/demo.png)
@@ -101,9 +101,9 @@ sure about, the main model the rest:
 
 ```python
 router.calibrator.fit(list(sink.read("support.triage")))
-print(router.readiness())                              # "ready: agreement 0.79 on 180, calibrator fitted"
-router.set_stage("canary", canary_share=0.2)           # refused with NotReady until that verdict is ready
-result = router.decide_state(ticket)["urgency"]        # .answer 2, .confidence 0.71, .answered_by "system1"
+print(router.readiness())                              # "ready: ..." or "stays in shadow: <what is missing>"
+router.set_stage("canary", canary_share=0.2)           # raises NotReady, naming what is missing, until ready
+result = router.decide_state(ticket)["urgency"]        # .answer, .confidence, .answered_by ("system1" when sure)
 ```
 
 A capability with an `output_schema` goes through `GenerativeRouter` the same way. A real

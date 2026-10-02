@@ -39,8 +39,8 @@
   <text x="817" y="124" text-anchor="middle" font-weight="bold" fill="#222">D · LoRA a small LLM</text>
   <text x="817" y="148" text-anchor="middle" fill="#333" font-size="13">only for capabilities that</text>
   <text x="817" y="166" text-anchor="middle" fill="#333" font-size="13">must generate text or code</text>
-  <text x="817" y="190" text-anchor="middle" fill="#333" font-size="13">the original Praxis path,</text>
-  <text x="817" y="208" text-anchor="middle" fill="#333" font-size="13">unchanged, behind the same port</text>
+  <text x="817" y="190" text-anchor="middle" fill="#333" font-size="13">the first feature after 1.0,</text>
+  <text x="817" y="208" text-anchor="middle" fill="#333" font-size="13">behind the same port</text>
   <text x="817" y="236" text-anchor="middle" fill="#666" font-size="13" font-weight="bold">hours · GPU or Apple MLX</text>
 
   <!-- shared bar -->

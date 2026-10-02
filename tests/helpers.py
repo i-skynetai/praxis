@@ -1,5 +1,5 @@
-"""Shared fixtures. The only example capability in this repository is ``support.triage``,
-defined once in ``praxis.demo`` and re-exported here for the tests."""
+"""Shared fixtures. The example capabilities are ``support.triage`` (decision) and
+``support.extract`` (generative), defined once in ``praxis_core.demo`` and used from there."""
 
 from __future__ import annotations
 

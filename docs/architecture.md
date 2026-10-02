@@ -173,14 +173,13 @@ does; Rungs B and C arrive with the trainers; Rung D is the generative path belo
 
 ## 7 · The generative path
 
-The original modules stay for capabilities that must generate text or code:
-`praxis_core/legacy/seam.py` (a capability with an output schema and the dict-of-types validator,
-now behind the `SchemaValidator` port), `praxis_core/legacy/gate.py` (four checks: right capability,
-valid schema, within the latency bound, not a duplicate; rejections counted by reason),
-`praxis_core/legacy/student.py` (`LoraStudent`, whose `fit` raises until a backend is wired in),
-`praxis_core/legacy/router.py` and `praxis_core/legacy/evaluate.py` (confident-wrong reported separately from
-deflection). The `GenerativeModel` port is declared; routing generative capabilities
-through the same policy is a later milestone (see [ROADMAP.md](../ROADMAP.md)).
+A capability with an `output_schema` goes through `GenerativeRouter`: the same eight
+steps, the same stages, the same readiness gate. The student is a `GenerativeModel`
+that returns an output and one confidence number; the `SchemaValidator` port is the hard
+gate; a Platt calibrator maps that number to a probability of matching the teacher.
+`support.extract` in the demo is the example, and its nearest-neighbour student shows
+the gate working: it cannot extract, so the verdict keeps it in shadow. A fine-tuned
+student is the first feature after 1.0 ([PX-071](features/PX-071-lora-trainer.md)).
 
 
 ## Guarantees, and the test that proves each
@@ -209,12 +208,13 @@ design is in [decisions.md](decisions.md), one dated entry per decision.
 | | |
 |---|---|
 | **contracts** | `Question`, `Capability` (kind = `decision` \| `generative`), `DecisionRequest`, `DecisionResult`, `DecisionExample`, and the trace envelope v2: a stable Praxis envelope, an opaque host partition key, an opaque payload. |
-| **ports** | Seven `Protocol`s: `DecisionModel`, `Teacher`, `Calibrator`, `Trainer`, `TraceSink`, `SchemaValidator`, `Registry`, plus the sibling `GenerativeModel`. One fake per port ships in `praxis_core.providers.fake`. |
-| **router** | `DecisionRouter` and `GenerativeRouter`: eight steps per call: policy, timed and bounded System-1 call, calibrate, validate, serve or abstain, teacher for the rest (everything, in shadow), record. Plus `observe()`: the app's own answer becomes the trace. |
+| **ports** | Nine `Protocol`s: `DecisionModel`, `GenerativeModel`, `Teacher`, `Calibrator`, `ScalarCalibrator`, `Trainer`, `TraceSink`, `SchemaValidator`, `Registry`. One fake per port ships in `praxis_core.providers.fake`. |
+| **router** | `DecisionRouter` and `GenerativeRouter`: eight steps per call: policy, timed and bounded System-1 call, calibrate, validate, serve or abstain, teacher for the rest (everything, in shadow), record. Plus `observe()`: the app's own answer becomes the trace. And `readiness()`, the verdict that gates `set_stage`. |
 | **calibrator** | One temperature per (question type, option count) for distributions; a Platt map for a scalar confidence. Both fitted on traces that carry both answers. No gradients, no dependency. |
 | **sinks** | JSONL and SQLite, and a background queue in front of either. All round-trip the envelope and read back by capability. |
-| **baseline** | The nearest-neighbour student behind the `DecisionModel` port: a distribution from similarity-weighted votes, the best similarity kept as `native_confidence`. Exists so the loop is demonstrably closed and a real model has a number to beat. |
-| **seam, gate, student, evaluate** | The original modules, kept for the generative path: the four-check gate, the confident-wrong metric, and a `LoraStudent` whose `fit` raises until a backend is wired in. |
+| **baseline** | Nearest-neighbour students for both kinds: for decisions, a distribution from similarity-weighted votes with the best similarity kept as `native_confidence`; for generation, the nearest example's output. They exist so the loop is demonstrably closed and a real model has a number to beat. |
+| **dataset** | Traces to examples, with every skipped trace counted by reason. |
+| **demo** | The two example capabilities, the synthetic ticket generator, the rule teachers, and `python3 -m praxis_core demo`. |
 
 
 ## Ports and adapters

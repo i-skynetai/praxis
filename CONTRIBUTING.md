@@ -54,17 +54,17 @@ them into abstentions, and hiding them would hide the failure rate.
 - **A System-1 failure that reaches the caller.** An error, a timeout or a malformed
   answer is an abstention with a reason, never an exception. The fault-injection tests
   in `tests/test_router.py` are the contract.
-- **A student that reports itself trained when it is not.** `LoraStudent.fit` raises
-  until a backend is wired in, and the nearest-neighbour model answers uniform (never
-  served) until it is fitted. Confident-wrong is the exact failure this project exists to
+- **A student that reports itself trained when it is not.** The nearest-neighbour
+  students answer uniform, with zero confidence, until they are fitted, and a trainer
+  with no backend raises rather than returning something. Confident-wrong is the exact failure this project exists to
   prevent, and a student that pretends to be trained is the purest form of it.
 - **Deflection reported on its own.** Any metric change keeps confident-wrong as a
   separate column. A number that can be improved by answering more things wrongly is not
   a measure of quality.
 - **A silently skipped trace.** The dataset builder reports every skip by reason. "Probably
   fine" is not one of them.
-- **A product, host or vendor in the core or the docs.** The only example capability is
-  `support.triage`.
+- **A product, host or vendor in the core or the docs.** The example capabilities are
+  `support.triage` and `support.extract`, on synthetic support tickets.
 
 ## Documentation
 

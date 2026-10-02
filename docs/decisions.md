@@ -95,8 +95,8 @@ the contract reads plainly.
 
 **Context.** `praxis` on PyPI is another project that also installs an import package
 named `praxis`. **Decision.** Rename before anything is published, while the surface is
-small. **Consequences.** A one-time rename; the legacy modules moved under
-`praxis_core.legacy` until their replacements land.
+small. **Consequences.** A one-time rename; the v0.1 modules moved under
+`praxis_core.legacy` until their replacements landed, and were removed in 0.3.2.
 
 ## D-13 — Safe by default, and promotion is a gate, not advice (2026-10-01)
 
