@@ -4,11 +4,13 @@ when PRAXIS_LIVE=1 and the server answers."""
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import threading
 import unittest
 import urllib.request
+import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -202,6 +204,21 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         self.assertEqual(
             self.adapter.generate(TICKET, "", EXTRACT.output_schema).confidence, 0.0, "missing confidence is 0"
         )
+
+    def test_error_responses_are_closed(self):
+        """PX-903: an HTTP error body is read and closed; nothing is left for the collector."""
+        adapter = OpenAICompatible(self.server.base_url, "m", retries=0, backoff_s=0.0)
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always", ResourceWarning)
+            for status in (429, 500, 503, 400):
+                self.server.replies.append((status, {"error": "no"}))
+                with self.assertRaises(ProviderError) as cm:
+                    adapter.answer(TICKET, CAP.questions)
+                self.assertEqual(cm.exception.status, status)
+                del cm
+            gc.collect()
+        leaks = [str(w.message) for w in seen if issubclass(w.category, ResourceWarning)]
+        self.assertEqual(leaks, [])
 
     def test_refusals_bad_bodies_and_http_errors(self):
         self.server.replies.append((200, completion("", refusal="I cannot help with that")))

@@ -300,7 +300,8 @@ class OpenAICompatible:
                     status = int(response.status)
             except urllib.error.HTTPError as exc:
                 status = int(exc.code)
-                snippet = exc.read()[:300].decode("utf-8", "replace")
+                with exc:  # the error is also the response; close it (PX-903)
+                    snippet = exc.read()[:300].decode("utf-8", "replace")
                 error = ProviderError(
                     f"HTTP {status} from {self.base_url}{path}: {snippet}",
                     status,
