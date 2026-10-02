@@ -3,6 +3,28 @@
 All notable changes, newest first. Versions follow semantic versioning; nothing is
 published to PyPI yet.
 
+## 0.3.2 — 2026-10-01 — safe by default, and the first public release
+
+Found by the first outside review of the committed tree. Behaviour changes are marked.
+
+- **Changed: safe defaults** (PX-900, the one P0). `RoutingPolicy()` is now
+  `stage="shadow"`, `require_calibrated=True`. A router built with no policy serves
+  nothing from the student until a calibrator is fitted and the stage is raised. Code
+  that relied on the old defaults must say `stage="serve", require_calibrated=False`.
+- **Changed: the readiness gate** (PX-901). `router.readiness()` returns the verdict
+  (comparisons, agreement, calibrator, what is missing) against thresholds on the policy.
+  `set_stage("canary" | "serve")` raises `NotReady` until it is ready; `force=True`
+  overrides and is counted. `NotReady`, `Readiness` and `GenerativeRouter` are exported.
+  The demo stops `support.extract` at the gate instead of running canary anyway.
+- **Removed: `praxis_core.legacy`** (PX-902), the v0.1 modules PX-070 replaced, with
+  their 20 tests. The LoRA note is now the PX-071 design note.
+- **Docs match the code** (PX-902): a test runs the README's steps verbatim; the demo
+  picture is rendered from a real run by a script beside it; `python3` in the quick
+  start; CONTRIBUTING, architecture and three pictures corrected.
+- **Fixed:** the HTTP plug-in closes error responses (PX-903); no more
+  `ResourceWarning` on Python 3.14.
+- 154 tests on Python 3.11 to 3.14; ruff and `mypy --strict` clean.
+
 ## 0.3.1 — 2026-10-01 — the showcase bar
 
 - A **decision log** (`docs/decisions.md`): twelve dated entries, each with context,

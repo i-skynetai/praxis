@@ -136,7 +136,7 @@ Not a model, not a hosted service, and not a way to remove the big model.
 
 ## Status
 
-Version 0.3.1, the first milestone of the [v1.0 plan](docs/release-plan-v1.0.md). 163
+Version 0.3.2, the first milestone of the [v1.0 plan](docs/release-plan-v1.0.md). 154
 tests on Python 3.11 to 3.14, lint and type checks in CI, standard library only. Next on
 the [roadmap](ROADMAP.md): the dataset builder and the paired scorecard (0.4.0).
 

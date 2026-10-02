@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "praxis-core"
-version = "0.3.1"
+version = "0.3.2"
 description = "A provider-neutral System-1 / System-2 decision and training framework: capture what your model does, fit a small student, serve it with the big model as the permanent fallback."
 readme = "README.md"
 license = { file = "LICENSE" }
