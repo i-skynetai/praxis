@@ -366,7 +366,7 @@ class AFakeEndToEndDecideReturnsAResult(unittest.TestCase):
             cap,
             FakeTeacher(oracle),
             FakeDecisionModel(peak=0.97),
-            FakeCalibrator(),
+            FakeCalibrator(fitted=True),
             sink,
             RoutingPolicy(threshold=0.5, stage="serve"),
         )

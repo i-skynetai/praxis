@@ -70,6 +70,16 @@ accepted.
 | PX-024 | [OpenAI-compatible local adapter: student, System-1 and teacher](#px-024) | providers | P1 | M | Done | 0.3.0 |
 | PX-028 | [pip extras per adapter, dependencies imported lazily](#px-028) | packaging | P1 | S | Done | 0.3.0 |
 
+### 0.3.2 — the first public release
+
+Found by the first outside review of the committed tree (2026-10-01). One row at a time.
+
+| ID | Feature | Area | P | Size | Status | Owner |
+|---|---|---|---|---|---|---|
+| PX-900 | [Safe by default: shadow stage, calibration required](#px-900) | router | P0 | S | Done | 0.3.2 |
+| PX-901 | [Readiness gate: `set_stage` refuses canary and serve until the verdict is ready](#px-901) | router | P1 | S | Ready | |
+| PX-902 | [Remove the v0.1 modules; docs match the code; the demo picture is real output](#px-902) | docs | P1 | S | Ready | |
+
 ### 0.4.0 — trust the data, trust the eval (M2)
 
 | ID | Feature | Area | P | Size | Status | Owner |
@@ -202,6 +212,34 @@ calibrator works on distributions; a generative student reports one number. *Don
 when:* a Platt calibrator (two parameters, fitted by a stdlib optimiser on (confidence,
 matched) pairs) sits behind the same `Calibrator` port, is selected per capability kind,
 and lowers calibration error on a synthetic over-confident student in a test.
+
+### 0.3.2 — the first public release
+
+<a id="px-900"></a>**PX-900 — Safe by default.** *Found 2026-10-01, P0:* `RoutingPolicy`
+defaulted to `stage="serve"` and `require_calibrated=False`, so a router built with no
+policy served a confident student with no calibrator, against the README's "nothing is
+served uncalibrated". *Done when:* the defaults are `stage="shadow"` and
+`require_calibrated=True`; a test builds a router with no policy and a student that is
+always sure, and every answer comes from the teacher; the tests that want the old
+behaviour say so in their policy. *Starts in:* `praxis_core/router.py`.
+
+<a id="px-901"></a>**PX-901 — Readiness gate.** *Found 2026-10-01:* the demo printed
+"stays in shadow" and then ran canary and serve anyway; `set_stage` only swapped the
+policy. *Done when:* `router.readiness()` returns the verdict (shadow comparisons,
+agreement, calibrator fitted, what is missing) against thresholds on the policy;
+`set_stage("canary" | "serve")` raises `NotReady` naming what is missing unless
+`force=True`, and forced promotions are counted; the demo stops at the gate for the
+capability that is not ready; both routers are covered by tests. *Starts in:*
+`praxis_core/router.py`, `praxis_core/demo.py`.
+
+<a id="px-902"></a>**PX-902 — Docs match the code.** *Found 2026-10-01:*
+`praxis_core/legacy/` said it waited for PX-070, which shipped in 0.3.0; CONTRIBUTING
+named a class that no longer exists and one example capability where two ship; the demo
+picture was drawn, not captured; the README's demo command needs `python3` outside a
+virtual environment. *Done when:* the v0.1 modules and their tests are gone and nothing
+excludes them from the checks; every doc line found above is fixed; `docs/images/demo.png`
+is rendered from the real output by a script kept beside it; the roadmap's last column
+is named for what it holds.
 
 ### Adapters and providers
 

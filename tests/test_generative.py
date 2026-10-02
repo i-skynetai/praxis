@@ -32,7 +32,7 @@ from praxis_core.providers.fake import (
     FakeTraceSink,
 )
 from praxis_core.router import GenerativeRouter, RoutingPolicy, TeacherError
-from tests.helpers import TicketGenerator
+from tests.helpers import TicketGenerator, serving
 
 CAP = support_extract()
 TICKET = {
@@ -66,7 +66,7 @@ def make(
         system1,
         calibrator,
         sink,
-        policy or RoutingPolicy(threshold=0.5),
+        policy or serving(),
         match=match,
         rng=rng,
         on_trace_error=on_trace_error,
@@ -121,7 +121,7 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
     def test_error_timeout_and_absence(self):
         router, sink, _ = make(FakeGenerativeModel(fail=RuntimeError("boom")))
         self.assert_from_teacher(router.generate_state(TICKET), sink, "error:")
-        router, sink, _ = make(FakeGenerativeModel(delay_s=0.3), policy=RoutingPolicy(0.5, system1_timeout_ms=40))
+        router, sink, _ = make(FakeGenerativeModel(delay_s=0.3), policy=serving(system1_timeout_ms=40))
         self.assert_from_teacher(router.generate_state(TICKET), sink, "timeout:")
         router, sink, _ = make(None)
         self.assert_from_teacher(router.generate_state(TICKET), sink, "no system1")
@@ -152,7 +152,7 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
         ]
         sink = FakeTraceSink()
         for i in range(100):
-            router, _, _ = make(hostile[i % 5], sink=sink, policy=RoutingPolicy(0.5, system1_timeout_ms=20))
+            router, _, _ = make(hostile[i % 5], sink=sink, policy=serving(system1_timeout_ms=20))
             self.assertEqual(router.generate_state(TICKET).answered_by, "system2")
         self.assertEqual(len(sink.traces), 100)
         self.assertTrue(all(t.success and t.abstain for t in sink.traces))
@@ -202,7 +202,7 @@ class ServeShadowCanaryObserve(unittest.TestCase):
     def test_canary_share(self):
         router, _, _ = make(
             FakeGenerativeModel(extract_rule_teacher, confidence=0.97),
-            policy=RoutingPolicy(0.5, stage="canary", canary_share=0.5),
+            policy=serving(stage="canary", canary_share=0.5),
             rng=random.Random(2),
         )
         for _ in range(40):
@@ -235,17 +235,30 @@ class ServeShadowCanaryObserve(unittest.TestCase):
     def test_require_calibrated_refuses_an_uncalibrated_student(self):
         model = FakeGenerativeModel(extract_rule_teacher, confidence=0.97)
         router, sink, _ = make(
-            model, calibrator=FakeScalarCalibrator(fitted=False), policy=RoutingPolicy(0.5, require_calibrated=True)
+            model, calibrator=FakeScalarCalibrator(fitted=False), policy=serving(require_calibrated=True)
         )
         r = router.generate_state(TICKET)
         self.assertEqual(r.answered_by, "system2")
         self.assertTrue(r.reason.startswith("uncalibrated"), r.reason)
         router, _, _ = make(
-            model, calibrator=FakeScalarCalibrator(fitted=True), policy=RoutingPolicy(0.5, require_calibrated=True)
+            model, calibrator=FakeScalarCalibrator(fitted=True), policy=serving(require_calibrated=True)
         )
         self.assertEqual(router.generate_state(TICKET).answered_by, "system1")
-        router, _, _ = make(model, policy=RoutingPolicy(0.5, require_calibrated=True))
+        router, _, _ = make(model, policy=serving(require_calibrated=True))
         self.assertTrue(router.generate_state(TICKET).reason.startswith("uncalibrated"), "no calibrator at all")
+
+    def test_a_router_with_no_policy_never_serves_an_uncalibrated_student(self):
+        """PX-900, the generative kind."""
+        sure = FakeGenerativeModel(extract_rule_teacher, confidence=1.0)
+        router = GenerativeRouter(CAP, teacher(), sure, None, FakeTraceSink())
+        self.assertEqual(router.generate_state(TICKET).answered_by, "system2", "shadow by default")
+        router.set_policy(RoutingPolicy(stage="serve"))
+        r = router.generate_state(TICKET)
+        self.assertEqual(r.answered_by, "system2")
+        self.assertTrue(r.reason.startswith("uncalibrated"), r.reason)
+        fitted = GenerativeRouter(CAP, teacher(), sure, FakeScalarCalibrator(fitted=True), FakeTraceSink())
+        fitted.set_policy(RoutingPolicy(stage="serve"))
+        self.assertEqual(fitted.generate_state(TICKET).answered_by, "system1")
 
     def test_teacher_failure_is_recorded_then_raised(self):
         router, sink, _ = make(None, teacher_model=FakeGenerativeModel(fail=RuntimeError("boom")))

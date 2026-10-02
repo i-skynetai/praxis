@@ -20,7 +20,7 @@ from praxis_core.contracts import (
 )
 from praxis_core.providers.fake import MALFORMED_MODES, FakeCalibrator, FakeDecisionModel, FakeTeacher, FakeTraceSink
 from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
-from tests.helpers import TicketGenerator, oracle, triage_capability
+from tests.helpers import TicketGenerator, oracle, serving, triage_capability
 
 CAP = triage_capability()
 TICKET = {
@@ -43,7 +43,7 @@ def make(system1=None, *, policy=None, sink=None, calibrator=None, teacher=None,
         system1,
         calibrator,
         sink,
-        policy or RoutingPolicy(threshold=0.5),
+        policy or serving(),
         rng=rng,
         on_trace_error=on_trace_error,
     )
@@ -75,9 +75,7 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
         self.assertEqual(router.stats.abstain_reasons["error"], 3)
 
     def test_a_system1_timeout_is_an_abstention_with_a_reason(self):
-        router, sink, _ = make(
-            FakeDecisionModel(delay_s=0.3), policy=RoutingPolicy(threshold=0.5, system1_timeout_ms=40)
-        )
+        router, sink, _ = make(FakeDecisionModel(delay_s=0.3), policy=serving(system1_timeout_ms=40))
         self.assert_all_from_teacher(router.decide_state(TICKET), sink, "timeout:")
         self.assertLess(sink.traces[-1].system1_latency_ms or 0.0, 250.0)
 
@@ -109,7 +107,7 @@ class FaultInjectionNeverFailsTheCall(unittest.TestCase):
         ]
         sink = FakeTraceSink()
         for i in range(100):
-            router, _, _ = make(hostile[i % len(hostile)], sink=sink, policy=RoutingPolicy(0.5, system1_timeout_ms=20))
+            router, _, _ = make(hostile[i % len(hostile)], sink=sink, policy=serving(system1_timeout_ms=20))
             results = router.decide_state(TICKET)
             self.assertEqual({r.answered_by for r in results.values()}, {"system2"})
         self.assertEqual(len(sink.traces), 100)
@@ -228,16 +226,12 @@ class ServeAndAbstain(unittest.TestCase):
 
     def test_require_calibrated_refuses_an_uncalibrated_question(self):
         model = FakeDecisionModel(pick=oracle_key, peak=0.97)
-        router, _, _ = make(
-            model, calibrator=FakeCalibrator(fitted=False), policy=RoutingPolicy(0.5, require_calibrated=True)
-        )
+        router, _, _ = make(model, calibrator=FakeCalibrator(fitted=False), policy=serving(require_calibrated=True))
         results = router.decide_state(TICKET)
         self.assertTrue(
             all(r.answered_by == "system2" and r.reason.startswith("uncalibrated") for r in results.values())
         )
-        router, _, _ = make(
-            model, calibrator=FakeCalibrator(fitted=True), policy=RoutingPolicy(0.5, require_calibrated=True)
-        )
+        router, _, _ = make(model, calibrator=FakeCalibrator(fitted=True), policy=serving(require_calibrated=True))
         self.assertTrue(all(r.answered_by == "system1" for r in router.decide_state(TICKET).values()))
 
     def test_score_results_carry_an_expected_value(self):
@@ -259,18 +253,18 @@ class ServeAndAbstain(unittest.TestCase):
                 seen.extend(questions.values())
                 return model.decide(state, questions)
 
-        router = DecisionRouter(cap, FakeTeacher(), Spy(), None, FakeTraceSink(), RoutingPolicy(0.1))
+        router = DecisionRouter(cap, FakeTeacher(), Spy(), None, FakeTraceSink(), serving(0.1))
         r = router.decide_state("x")["order"]
         self.assertEqual(r.answer, ["b", "a", "c"])
         self.assertEqual(r.answered_by, "system1")
         self.assertEqual(seen[0].type, "choice", "the adapter sees the choice form")
-        router = DecisionRouter(cap, FakeTeacher(), None, None, FakeTraceSink(), RoutingPolicy(0.1))
+        router = DecisionRouter(cap, FakeTeacher(), None, None, FakeTraceSink(), serving(0.1))
         r = router.decide_state("x")["order"]
         self.assertEqual(r.answer, ["a", "b", "c"])
         self.assertEqual(r.answered_by, "system2")
 
     def test_the_budget_caps_the_system1_timeout(self):
-        router, sink, _ = make(FakeDecisionModel(delay_s=0.3), policy=RoutingPolicy(0.5, system1_timeout_ms=5_000))
+        router, sink, _ = make(FakeDecisionModel(delay_s=0.3), policy=serving(system1_timeout_ms=5_000))
         results = router.decide(CAP.request(TICKET, RequestContext(budget=Budget(max_latency_ms=30))))
         self.assertTrue(all(r.reason.startswith("timeout") for r in results.values()))
 
@@ -283,7 +277,7 @@ class ServeAndAbstain(unittest.TestCase):
 class CanaryShare(unittest.TestCase):
     def test_share_zero_sends_every_call_to_the_teacher(self):
         router, _, teacher = make(
-            FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5, stage="canary", canary_share=0.0)
+            FakeDecisionModel(pick=oracle_key, peak=0.97), policy=serving(stage="canary", canary_share=0.0)
         )
         results = router.decide_state(TICKET)
         self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("canary") for r in results.values()))
@@ -291,7 +285,7 @@ class CanaryShare(unittest.TestCase):
 
     def test_share_one_behaves_like_serve(self):
         router, _, teacher = make(
-            FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5, stage="canary", canary_share=1.0)
+            FakeDecisionModel(pick=oracle_key, peak=0.97), policy=serving(stage="canary", canary_share=1.0)
         )
         self.assertTrue(all(r.answered_by == "system1" for r in router.decide_state(TICKET).values()))
         self.assertEqual(teacher.calls, 0)
@@ -299,7 +293,7 @@ class CanaryShare(unittest.TestCase):
     def test_a_half_share_splits_the_calls(self):
         router, _, _ = make(
             FakeDecisionModel(pick=oracle_key, peak=0.97),
-            policy=RoutingPolicy(0.5, stage="canary", canary_share=0.5),
+            policy=serving(stage="canary", canary_share=0.5),
             rng=random.Random(1),
         )
         for _ in range(40):
@@ -349,6 +343,32 @@ class TheTeacherIsTheOnlyThingThatCanFail(unittest.TestCase):
     def test_a_confident_system1_still_needs_no_teacher(self):
         router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97), teacher=FakeTeacher(fail=RuntimeError("x")))
         self.assertTrue(all(r.answered_by == "system1" for r in router.decide_state(TICKET).values()))
+
+
+class TheDefaultPolicyIsSafe(unittest.TestCase):
+    """PX-900. A router built with no policy shadows and serves nothing uncalibrated; the
+    README's "nothing is served uncalibrated" is the default, not an option."""
+
+    def test_the_defaults_are_shadow_and_calibration_required(self):
+        policy = RoutingPolicy()
+        self.assertEqual(policy.stage, "shadow")
+        self.assertTrue(policy.require_calibrated)
+
+    def test_a_router_with_no_policy_never_serves_an_uncalibrated_student(self):
+        sure = FakeDecisionModel(pick=oracle_key, peak=1.0)  # always certain, never calibrated
+        sink = FakeTraceSink()
+        router = DecisionRouter(CAP, FakeTeacher(oracle), sure, None, sink)
+        results = router.decide_state(TICKET)
+        self.assertTrue(all(r.answered_by == "system2" for r in results.values()), "shadow by default")
+        self.assertTrue(all(q.system1_answer is not None for q in sink.traces[-1].questions), "but recorded")
+        router.set_policy(RoutingPolicy(stage="serve"))  # the stage alone is not enough
+        results = router.decide_state(TICKET)
+        self.assertTrue(
+            all(r.answered_by == "system2" and r.reason.startswith("uncalibrated") for r in results.values())
+        )
+        fitted = DecisionRouter(CAP, FakeTeacher(oracle), sure, FakeCalibrator(fitted=True), sink)
+        fitted.set_policy(RoutingPolicy(stage="serve"))
+        self.assertTrue(all(r.answered_by == "system1" for r in fitted.decide_state(TICKET).values()))
 
 
 class RequestsAreCheckedAgainstTheCapability(unittest.TestCase):

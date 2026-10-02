@@ -13,7 +13,7 @@ from praxis_core.dataset import examples_from_traces
 from praxis_core.ports import DecisionModel
 from praxis_core.providers.fake import FakeTeacher, FakeTraceSink
 from praxis_core.router import DecisionRouter, RoutingPolicy
-from tests.helpers import TicketGenerator, oracle, triage_capability
+from tests.helpers import TicketGenerator, oracle, serving, triage_capability
 
 CAP = triage_capability()
 
@@ -41,7 +41,7 @@ class TheBaselineIsADecisionModel(unittest.TestCase):
         for name, answer in raw.items():
             self.assertEqual(confidence(answer.distribution), 0.0, name)
             self.assertEqual(answer.native_confidence, 0.0)
-        router = DecisionRouter(CAP, FakeTeacher(oracle), model, None, FakeTraceSink(), RoutingPolicy(threshold=0.01))
+        router = DecisionRouter(CAP, FakeTeacher(oracle), model, None, FakeTraceSink(), serving(0.01))
         results = router.decide_state({"subject": "invoice charged twice"})
         self.assertTrue(
             all(r.answered_by == "system2" and r.reason.startswith("below threshold") for r in results.values())
@@ -88,7 +88,7 @@ class TheBaselineIsADecisionModel(unittest.TestCase):
         sink, generator = shadow_traces(60)
         model = NearestNeighbourDecisionModel()
         model.fit(examples_from_traces(sink.read(), CAP)[0])
-        router = DecisionRouter(CAP, FakeTeacher(oracle), model, None, FakeTraceSink(), RoutingPolicy(threshold=0.3))
+        router = DecisionRouter(CAP, FakeTeacher(oracle), model, None, FakeTraceSink(), serving(0.3))
         for ticket in generator.tickets(60):
             router.decide_state(ticket)
         stats = router.stats.as_dict()

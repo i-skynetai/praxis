@@ -91,13 +91,20 @@ class TeacherError(RuntimeError):
 
 @dataclass(frozen=True)
 class RoutingPolicy:
+    """Safe by default (PX-900): a router built with no policy shadows and serves nothing
+    until a calibrator is fitted and the stage is raised on purpose. Every default below
+    can be overridden, and a test pins the defaults."""
+
     threshold: float = 0.7
-    stage: Stage = "serve"
+    #: ``shadow`` records both answers and serves none of System-1's. Promotion to
+    #: ``canary`` or ``serve`` is a deliberate ``set_stage`` call.
+    stage: Stage = "shadow"
     canary_share: float = 0.1
     system1_timeout_ms: int = 2_000
     #: Serve nothing whose confidence did not pass through a *fitted* calibrator. The
     #: original design's rule: calibration is proven in shadow before any traffic moves.
-    require_calibrated: bool = False
+    #: ``False`` is the explicit opt-out for tests and for hosts that calibrate elsewhere.
+    require_calibrated: bool = True
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.threshold <= 1.0:

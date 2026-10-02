@@ -25,7 +25,7 @@ from praxis_core.providers.openai_compat import (
     distributions_schema,
     output_schema_json,
 )
-from praxis_core.router import DecisionRouter, GenerativeRouter, RoutingPolicy, TeacherError
+from praxis_core.router import DecisionRouter, GenerativeRouter, TeacherError
 from tests.helpers import triage_capability
 
 CAP = triage_capability()
@@ -246,13 +246,13 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
         self.server.replies.append((500, {}))
         student = OpenAICompatible(self.server.base_url, "m", retries=0)
         from praxis_core.providers.fake import FakeTeacher
-        from tests.helpers import oracle
+        from tests.helpers import oracle, serving
 
-        router = DecisionRouter(CAP, FakeTeacher(oracle), student, None, FakeTraceSink(), RoutingPolicy(0.5))
+        router = DecisionRouter(CAP, FakeTeacher(oracle), student, None, FakeTraceSink(), serving())
         results = router.decide_state(TICKET)
         self.assertTrue(all(r.answered_by == "system2" and r.reason.startswith("error:") for r in results.values()))
         self.server.replies.append((500, {}))
-        router2 = DecisionRouter(CAP, student, None, None, FakeTraceSink(), RoutingPolicy(0.5))
+        router2 = DecisionRouter(CAP, student, None, None, FakeTraceSink(), serving())
         with self.assertRaises(TeacherError):
             router2.decide_state(TICKET)
         self.server.replies.append(
@@ -263,7 +263,7 @@ class TheAdapterSpeaksTheWireProtocol(unittest.TestCase):
                 ),
             )
         )
-        gen = GenerativeRouter(EXTRACT, student, None, None, FakeTraceSink(), RoutingPolicy(0.5))
+        gen = GenerativeRouter(EXTRACT, student, None, None, FakeTraceSink(), serving())
         self.assertEqual(gen.generate_state(TICKET).output["order_id"], "AB1234")
 
     def test_extra_body_and_system_prompt_pass_through(self):

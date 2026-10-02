@@ -71,11 +71,11 @@ triage = Capability("support.triage", questions={
 the answer and never fails your request:
 
 ```python
-from praxis_core import DecisionRouter, ModelInfo, RoutingPolicy
+from praxis_core import DecisionRouter, ModelInfo
 from praxis_core.trace import JsonlTraceSink, QueuedTraceSink
 
 sink = QueuedTraceSink(JsonlTraceSink("traces.jsonl"))
-router = DecisionRouter(triage, teacher=my_teacher, sink=sink, policy=RoutingPolicy(stage="shadow"))
+router = DecisionRouter(triage, teacher=my_teacher, sink=sink)             # shadow stage by default
 
 answers = my_big_model(ticket)                                            # unchanged
 router.observe_state(ticket, answers, ModelInfo("my-provider", "big-model"), latency_ms=820)
@@ -85,6 +85,7 @@ router.observe_state(ticket, answers, ModelInfo("my-provider", "big-model"), lat
 router with a calibrator, and keep observing:
 
 ```python
+from praxis_core import RoutingPolicy
 from praxis_core.baseline import NearestNeighbourDecisionModel
 from praxis_core.calibrate import TemperatureCalibrator
 from praxis_core.dataset import examples_from_traces
@@ -92,7 +93,7 @@ from praxis_core.dataset import examples_from_traces
 examples, report = examples_from_traces(sink.read("support.triage"), triage)   # every skip is reported
 student = NearestNeighbourDecisionModel(); student.fit(examples)
 router = DecisionRouter(triage, teacher=my_teacher, system1=student, calibrator=TemperatureCalibrator(),
-                        sink=sink, policy=RoutingPolicy(threshold=0.6, stage="shadow", require_calibrated=True))
+                        sink=sink, policy=RoutingPolicy(threshold=0.6))   # still shadow; calibration required
 ```
 
 **5. Serve by confidence.** Let Praxis make the call; the student answers what it is
@@ -120,7 +121,7 @@ returns garbage can never fail your call. Details: [docs/architecture.md](docs/a
 
 - **Two capability kinds**, typed questions and schema outputs, one loop.
 - **Any student behind one interface**: a decision model, a small local LLM, a baseline, yours.
-- **Calibration built in**; nothing is served uncalibrated.
+- **Calibration built in**; by default nothing is served until a calibrator is fitted.
 - **Shadow, canary, serve**, with the main model as the permanent fallback.
 - **A replayable trace of every call**, JSONL or SQLite, behind a background queue.
 - **A readiness verdict** after shadow that names what is missing.
