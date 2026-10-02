@@ -91,13 +91,20 @@ choice. Whatever the provider says about itself is kept beside it and never rout
 The last row is the one place a call can fail. The teacher is the caller's own System-2,
 there is nothing behind it, and hiding its failure would mean inventing an answer.
 
-Two more rows apply to both kinds. `RoutingPolicy.require_calibrated` serves nothing
-whose confidence did not pass through a *fitted* calibrator (abstain: `uncalibrated`),
-which is the original design's rule that calibration is proven in shadow before any
-traffic moves. And in the generative router the validator is the hard gate: an output
-that fails the capability's schema is never served, whatever its confidence, and a
-host-supplied match function decides what counts as "the same output" for shadow
-agreement and calibration (the default is exact after normalisation).
+Two more rows apply to both kinds. `RoutingPolicy.require_calibrated`, on by default,
+serves nothing whose confidence did not pass through a *fitted* calibrator (abstain:
+`uncalibrated`), which is the original design's rule that calibration is proven in
+shadow before any traffic moves. And in the generative router the validator is the hard
+gate: an output that fails the capability's schema is never served, whatever its
+confidence, and a host-supplied match function decides what counts as "the same output"
+for shadow agreement and calibration (the default is exact after normalisation).
+
+The stage is earned, not declared. A router starts in `shadow`. `router.readiness()`
+is the verdict from its own shadow comparisons and its calibrator, against thresholds on
+the policy (`min_shadow_compared`, `min_shadow_agreement`, `require_calibrated`), and it
+names every missing item in words. `set_stage("canary")` or `set_stage("serve")` raises
+`NotReady` with that verdict until it is ready; `force=True` overrides and is counted on
+the stats, so a forced promotion is never silent. Moving down is never refused.
 
 ## 3 · The calibrator
 
@@ -192,7 +199,8 @@ design is in [decisions.md](decisions.md), one dated entry per decision.
 | An unfitted student is never served. | `tests/test_baseline.py` |
 | The core is standard library only, and no provider name appears outside `praxis_core/providers/`. | `tests/test_contracts.py::TheCoreIsStandardLibraryOnly` |
 | Capture never fails the request and adds no visible latency: observe mode never raises; the background sink returns in microseconds and counts drops. | `tests/test_router.py::ObserveModeNeverTouchesTheRequestPath`, `tests/test_sinks.py::TheBackgroundSinkCostsTheCallerNothing` |
-| Nothing is served without a fitted calibrator when the policy says so. | `tests/test_generative.py`, `tests/test_router.py` (`require_calibrated`) |
+| Nothing is served without a fitted calibrator, by default. The opt-out is a policy field, and a test pins the defaults. | `tests/test_router.py::TheDefaultPolicyIsSafe`, `tests/test_generative.py` |
+| The stage is earned: `set_stage` past shadow raises `NotReady` until the verdict is ready; a forced promotion is counted. | `tests/test_router.py::PromotionIsGated`, `tests/test_generative.py` |
 | A captured trace rebuilds the request it recorded. | `tests/test_router.py` (replay equivalence) |
 | The whole loop closes in under a second with nothing installed, for both kinds. | `tests/test_demo.py` |
 

@@ -15,6 +15,11 @@ Per call, in order (plan §3.4):
    holds both answers side by side.
 8. Record the trace. Nothing on that path can raise into the caller.
 
+The stage is earned, not declared (PX-901): a router starts in ``shadow``, and
+``set_stage`` to ``canary`` or ``serve`` is refused with ``NotReady`` until the shadow
+verdict (``readiness()``) is ready: enough comparisons, enough agreement, a fitted
+calibrator. ``force=True`` overrides and is counted.
+
 Two guarantees fall out of this. A System-1 error, timeout or malformed answer is an
 abstention with a reason, never a caller-visible failure. And the trace path is
 fire-and-forget: a broken sink is counted, not raised.
@@ -105,6 +110,11 @@ class RoutingPolicy:
     #: original design's rule: calibration is proven in shadow before any traffic moves.
     #: ``False`` is the explicit opt-out for tests and for hosts that calibrate elsewhere.
     require_calibrated: bool = True
+    #: The readiness gate (PX-901): ``set_stage`` to canary or serve needs at least this
+    #: many shadow comparisons, at least this agreement with the teacher, and a fitted
+    #: calibrator when ``require_calibrated`` is set. ``readiness()`` says what is missing.
+    min_shadow_compared: int = 30
+    min_shadow_agreement: float = 0.5
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.threshold <= 1.0:
@@ -115,6 +125,87 @@ class RoutingPolicy:
             raise ValueError("canary_share must be within [0, 1]")
         if self.system1_timeout_ms <= 0:
             raise ValueError("system1_timeout_ms must be positive")
+        if self.min_shadow_compared < 1:
+            raise ValueError("min_shadow_compared must be at least 1")
+        if not 0.0 <= self.min_shadow_agreement <= 1.0:
+            raise ValueError("min_shadow_agreement must be within [0, 1]")
+
+
+_STAGE_ORDER: dict[str, int] = {"shadow": 0, "canary": 1, "serve": 2}
+
+
+@dataclass(frozen=True)
+class Readiness:
+    """The verdict after shadow (PX-901): may this router move past shadow?
+
+    Built from the router's own shadow comparisons and its calibrator, against the
+    thresholds on the policy. ``missing`` names every unmet condition in plain words;
+    ``verdict`` is the one line the demo prints and ``praxis status`` will print."""
+
+    ready: bool
+    compared: int
+    agreement: float | None
+    calibrated: bool
+    missing: tuple[str, ...]
+    min_compared: int
+    min_agreement: float
+
+    @property
+    def verdict(self) -> str:
+        if self.ready:
+            agreement = 0.0 if self.agreement is None else self.agreement
+            fitted = "calibrator fitted" if self.calibrated else "no calibrator required"
+            return f"ready: agreement {agreement:.2f} on {self.compared}, {fitted}"
+        return "stays in shadow: " + "; ".join(self.missing)
+
+    def __str__(self) -> str:
+        return self.verdict
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "ready": self.ready,
+            "compared": self.compared,
+            "agreement": None if self.agreement is None else round(self.agreement, 4),
+            "calibrated": self.calibrated,
+            "missing": list(self.missing),
+            "min_compared": self.min_compared,
+            "min_agreement": self.min_agreement,
+            "verdict": self.verdict,
+        }
+
+
+class NotReady(RuntimeError):
+    """``set_stage`` refused to move past shadow: the verdict names what is missing.
+
+    ``set_stage(stage, force=True)`` overrides it; a forced promotion is counted on the
+    router's stats so it is never silent."""
+
+    def __init__(self, stage: Stage, readiness: Readiness) -> None:
+        super().__init__(f"cannot move to {stage}: {readiness.verdict}")
+        self.stage: Stage = stage
+        self.readiness = readiness
+
+
+def _readiness(stats: RouterStats, policy: RoutingPolicy, calibrated: bool) -> Readiness:
+    compared = stats.shadow_compared
+    agreement = stats.shadow_agreed / compared if compared else None
+    missing: list[str] = []
+    if compared < policy.min_shadow_compared:
+        missing.append(f"only {compared} of {policy.min_shadow_compared} shadow comparisons")
+    if agreement is None or agreement < policy.min_shadow_agreement:
+        shown = 0.0 if agreement is None else agreement
+        missing.append(f"shadow agreement {shown:.2f} < {policy.min_shadow_agreement}")
+    if policy.require_calibrated and not calibrated:
+        missing.append("calibrator not fitted")
+    return Readiness(
+        ready=not missing,
+        compared=compared,
+        agreement=agreement,
+        calibrated=calibrated,
+        missing=tuple(missing),
+        min_compared=policy.min_shadow_compared,
+        min_agreement=policy.min_shadow_agreement,
+    )
 
 
 @dataclass
@@ -158,6 +249,13 @@ class RouterStats:
     trace_failures: int = 0
     observed: int = 0
     observe_failures: int = 0
+    forced_promotions: int = 0
+
+    def reset_shadow(self) -> None:
+        """Start the shadow comparison count again: the student was refitted in place, so
+        the readiness verdict should speak for the student that is running now."""
+        self.shadow_compared = 0
+        self.shadow_agreed = 0
 
     def as_dict(self) -> dict[str, Any]:
         share = self.system1_questions / self.questions if self.questions else 0.0
@@ -176,6 +274,7 @@ class RouterStats:
             "trace_failures": self.trace_failures,
             "observed": self.observed,
             "observe_failures": self.observe_failures,
+            "forced_promotions": self.forced_promotions,
         }
 
 
@@ -242,10 +341,36 @@ class DecisionRouter:
         return self._policy
 
     def set_policy(self, policy: RoutingPolicy) -> None:
+        """Replace the whole policy, gate and all. The deliberate way to declare a stage;
+        ``set_stage`` is the gated way to earn one."""
         self._policy = policy
 
-    def set_stage(self, stage: Stage, **changes: Any) -> None:
+    def readiness(self) -> Readiness:
+        """May this router move past shadow? From its own shadow comparisons and its
+        calibrator, against the thresholds on the policy. Comparisons accumulate for the
+        life of the router: give a newly fitted student a new router, as the README does,
+        or call ``stats.reset_shadow()`` after refitting one in place."""
+        calibrated = self.calibrator is not None and all(
+            self.calibrator.is_fitted(q.as_choice()) for q in self.capability.questions.values()
+        )
+        return _readiness(self.stats, self._policy, calibrated)
+
+    def set_stage(self, stage: Stage, *, force: bool = False, **changes: Any) -> None:
+        """Move to ``stage``. Up to canary or serve needs a ready verdict, or it raises
+        ``NotReady`` naming what is missing; ``force=True`` overrides and is counted.
+        Moving down is never refused."""
+        self._promote(stage, force)
         self._policy = replace(self._policy, stage=stage, **changes)
+
+    def _promote(self, stage: Stage, force: bool) -> None:
+        if _STAGE_ORDER[stage] <= _STAGE_ORDER[self._policy.stage]:
+            return
+        verdict = self.readiness()
+        if verdict.ready:
+            return
+        if not force:
+            raise NotReady(stage, verdict)
+        self.stats.forced_promotions += 1
 
     # entry points ------------------------------------------------------------
     def decide_state(self, state: str | dict[str, Any], context: Any = None) -> dict[str, DecisionResult]:
@@ -759,9 +884,22 @@ class GenerativeRouter:
         return self._policy
 
     def set_policy(self, policy: RoutingPolicy) -> None:
+        """Replace the whole policy, gate and all; ``set_stage`` is the gated way up."""
         self._policy = policy
 
-    def set_stage(self, stage: Stage, **changes: Any) -> None:
+    def readiness(self) -> Readiness:
+        """May this router move past shadow? See ``DecisionRouter.readiness``."""
+        calibrated = self.calibrator is not None and self.calibrator.is_fitted()
+        return _readiness(self.stats, self._policy, calibrated)
+
+    def set_stage(self, stage: Stage, *, force: bool = False, **changes: Any) -> None:
+        """Move to ``stage``; see ``DecisionRouter.set_stage``."""
+        if _STAGE_ORDER[stage] > _STAGE_ORDER[self._policy.stage]:
+            verdict = self.readiness()
+            if not verdict.ready:
+                if not force:
+                    raise NotReady(stage, verdict)
+                self.stats.forced_promotions += 1
         self._policy = replace(self._policy, stage=stage, **changes)
 
     # entry points ------------------------------------------------------------

@@ -98,6 +98,18 @@ named `praxis`. **Decision.** Rename before anything is published, while the sur
 small. **Consequences.** A one-time rename; the legacy modules moved under
 `praxis_core.legacy` until their replacements land.
 
+## D-13 — Safe by default, and promotion is a gate, not advice (2026-10-01)
+
+**Context.** The first outside review built a router with no policy and a student that
+was always sure, and was served an uncalibrated answer; the demo printed "stays in
+shadow" and then ran canary and serve anyway. Both contradicted the README.
+**Decision.** `RoutingPolicy` defaults to `stage="shadow"` and `require_calibrated=True`;
+`router.readiness()` is the verdict, computed from the router's own shadow comparisons
+against thresholds on the policy; `set_stage` past shadow raises `NotReady` until it is
+ready, and `force=True` is counted. **Consequences.** The README's claims are the
+defaults; the opt-out is a visible policy field the tests use by name; the demo stops at
+the gate for the capability that is not ready and says so.
+
 ## D-12 — Trust the loop before the model: no fine-tuning in v1.0 (2026-09-30)
 
 **Context.** The original design's ordering rule, and the v1.0 scope. **Decision.** v1.0

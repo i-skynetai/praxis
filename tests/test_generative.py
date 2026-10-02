@@ -31,7 +31,7 @@ from praxis_core.providers.fake import (
     FakeScalarCalibrator,
     FakeTraceSink,
 )
-from praxis_core.router import GenerativeRouter, RoutingPolicy, TeacherError
+from praxis_core.router import GenerativeRouter, NotReady, RoutingPolicy, TeacherError
 from tests.helpers import TicketGenerator, serving
 
 CAP = support_extract()
@@ -260,7 +260,24 @@ class ServeShadowCanaryObserve(unittest.TestCase):
         fitted.set_policy(RoutingPolicy(stage="serve"))
         self.assertEqual(fitted.generate_state(TICKET).answered_by, "system1")
 
-    def test_teacher_failure_is_recorded_then_raised(self):
+    def test_promotion_is_gated_for_the_generative_kind_too(self):
+        """PX-901."""
+        model = FakeGenerativeModel(extract_rule_teacher, confidence=0.9)
+        router, _, _ = make(model, calibrator=FakeScalarCalibrator(fitted=True), policy=RoutingPolicy(0.5))
+        with self.assertRaises(NotReady) as caught:
+            router.set_stage("canary")
+        self.assertTrue(str(caught.exception).startswith("cannot move to canary: stays in shadow"))
+        for ticket in TicketGenerator(3).tickets(30):
+            router.generate_state(ticket)
+        verdict = router.readiness()
+        self.assertTrue(verdict.ready, verdict.verdict)
+        self.assertEqual((verdict.compared, verdict.agreement), (30, 1.0))
+        router.set_stage("serve")
+        self.assertEqual(router.policy.stage, "serve")
+        forced, _, _ = make(model, policy=RoutingPolicy(0.5))
+        forced.set_stage("serve", force=True)
+        self.assertEqual(forced.stats.forced_promotions, 1)
+
         router, sink, _ = make(None, teacher_model=FakeGenerativeModel(fail=RuntimeError("boom")))
         with self.assertRaises(TeacherError):
             router.generate_state(TICKET)

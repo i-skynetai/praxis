@@ -12,7 +12,10 @@ Four stages, in the order the plan says to trust the loop before the model:
    answer; Praxis records it, and records that the unfitted student had nothing to say.
 2. The teacher's answers become labels, the student is fitted, and a second ``shadow``
    pass records both answers side by side. Those traces fit the calibrator.
-3. ``canary``: half the calls may be served by System-1 when it is confident.
+3. ``canary``: half the calls may be served by System-1 when it is confident. The router
+   refuses this step (``NotReady``) until its own verdict is ready: enough shadow
+   comparisons, enough agreement, a fitted calibrator. The capability that is not ready
+   stops here, and the demo says so.
 4. ``serve``: every confident, valid answer is System-1's; the rest abstain to the teacher.
 
 The last line reports how many System-1 answers the teacher would have disagreed with,
@@ -34,7 +37,9 @@ from praxis_core.contracts import Answer, Capability, ModelInfo, Question, State
 from praxis_core.dataset import examples_from_traces, generative_examples_from_traces
 from praxis_core.ports import TraceSink
 from praxis_core.providers.fake import FakeGenerativeModel, FakeTeacher, FakeTraceSink
-from praxis_core.router import DecisionRouter, GenerativeRouter, RoutingPolicy
+from praxis_core.router import DecisionRouter, GenerativeRouter, NotReady, RoutingPolicy
+
+EXTRACT_NAME = "support.extract"
 
 DEPARTMENTS = {
     "billing": "Invoices, charges, refunds and payment methods.",
@@ -69,7 +74,7 @@ PRODUCTS = ("Nimbus router", "Atlas backup", "Orbit subscription", "Pulse monito
 def support_extract() -> Capability:
     """The generative sibling: three fields out of the same tickets."""
     return Capability(
-        name="support.extract",
+        name=EXTRACT_NAME,
         kind="generative",
         description="Pull the product, the issue type and the order id out of an inbound support ticket.",
         instructions=(
@@ -270,7 +275,9 @@ class DemoSummary:
     extract_confident_wrong: int = 0
     extract_trace_count: int = 0
     verdict: str = ""
+    promoted: bool = False
     extract_verdict: str = ""
+    extract_promoted: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -281,10 +288,12 @@ class DemoSummary:
             "confident_wrong": self.confident_wrong,
             "trace_count": self.trace_count,
             "verdict": self.verdict,
+            "promoted": self.promoted,
             "extract": {
                 "stages": [s.as_dict() for s in self.extract_stages],
                 "platt": self.extract_platt,
                 "verdict": self.extract_verdict,
+                "promoted": self.extract_promoted,
                 "examples": self.extract_examples,
                 "served_by_system1": self.extract_served_by_system1,
                 "confident_wrong": self.extract_confident_wrong,
@@ -292,23 +301,6 @@ class DemoSummary:
             },
             "elapsed_ms": round(self.elapsed_ms, 1),
         }
-
-
-def readiness(
-    agreement: float | None, compared: int, calibrated: bool, min_agreement: float = 0.5, min_compared: int = 30
-) -> str:
-    """A one-line verdict after shadow: the minimal form of what ``praxis status`` (PX-110)
-    will say against the v1.0 gates. Nothing moves to canary without it."""
-    missing = []
-    if compared < min_compared:
-        missing.append(f"only {compared} of {min_compared} shadow comparisons")
-    if agreement is None or agreement < min_agreement:
-        missing.append(f"shadow agreement {0.0 if agreement is None else agreement:.2f} < {min_agreement}")
-    if not calibrated:
-        missing.append("calibrator not fitted")
-    if missing:
-        return "stays in shadow: " + "; ".join(missing)
-    return f"ready for canary: agreement {agreement:.2f} on {compared}, calibrator fitted"
 
 
 def _run_stage(
@@ -399,38 +391,43 @@ def run_demo(
 
     examples, report = examples_from_traces(sink.read(capability.name), capability)
     summary.examples = student.fit(examples) if hasattr(student, "fit") else 0  # 2. labels → student
-    warm = _run_stage(router, generator, tickets, "shadow-warm")  #    both answers side by side
-    show(warm)
+    router.stats.reset_shadow()  # the student changed; the verdict must speak for the fitted one
+    show(_run_stage(router, generator, tickets, "shadow-warm"))  #    both answers side by side
     summary.temperatures = dict(calibrator.fit(list(sink.read(capability.name))))  # → calibrator
-    summary.verdict = readiness(warm.agreement, warm.questions, bool(summary.temperatures))
+    summary.verdict = router.readiness().verdict
     say(f"verdict: {summary.verdict}")
 
-    router.set_stage("canary")  # 3. half the calls may be served
-    show(_run_stage(router, generator, tickets, "canary-50%"))
-
-    router.set_stage("serve")  # 4. serve when confident
     served_states: list[tuple[dict[str, str], str, Answer]] = []
-    serve_started = time.perf_counter()
-    before = router.stats.as_dict()
-    for ticket in generator.tickets(tickets):
-        for name, result in router.decide_state(ticket).items():
-            if result.answered_by == "system1":
-                served_states.append((ticket, name, result.answer))
-    after = router.stats.as_dict()
-    questions = after["questions"] - before["questions"]
-    show(
-        StageReport(
-            "serve",
-            tickets,
-            questions,
-            (after["system1_questions"] - before["system1_questions"]) / questions if questions else 0.0,
-            (sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())) / questions
-            if questions
-            else 0.0,
-            None,
-            (time.perf_counter() - serve_started) * 1000.0,
+    try:
+        router.set_stage("canary")  # 3. half the calls may be served, if the verdict allows
+    except NotReady as exc:
+        say(f"canary: refused, {exc.readiness.verdict}; the loop stops here for {capability.name}")
+    else:
+        summary.promoted = True
+        show(_run_stage(router, generator, tickets, "canary-50%"))
+
+        router.set_stage("serve")  # 4. serve when confident
+        serve_started = time.perf_counter()
+        before = router.stats.as_dict()
+        for ticket in generator.tickets(tickets):
+            for name, result in router.decide_state(ticket).items():
+                if result.answered_by == "system1":
+                    served_states.append((ticket, name, result.answer))
+        after = router.stats.as_dict()
+        questions = after["questions"] - before["questions"]
+        show(
+            StageReport(
+                "serve",
+                tickets,
+                questions,
+                (after["system1_questions"] - before["system1_questions"]) / questions if questions else 0.0,
+                (sum(after["abstain_reasons"].values()) - sum(before["abstain_reasons"].values())) / questions
+                if questions
+                else 0.0,
+                None,
+                (time.perf_counter() - serve_started) * 1000.0,
+            )
         )
-    )
 
     # The number to watch: served by System-1, and the teacher would have said otherwise.
     for ticket, name, answer in served_states:
@@ -459,10 +456,14 @@ def run_demo(
         f"{summary.trace_count + summary.extract_trace_count} traces recorded; the trace path raised into the "
         f"caller {router.stats.trace_failures} times"
     )
-    say(
-        f"loop closed in {summary.elapsed_ms:.0f} ms: capture -> label -> fit -> calibrate -> canary -> serve, "
-        f"for both kinds. The teacher stays."
-    )
+    steps = "capture -> label -> fit -> calibrate -> canary -> serve"
+    closed = [n for n, ok in ((capability.name, summary.promoted), (EXTRACT_NAME, summary.extract_promoted)) if ok]
+    stopped = [n for n, ok in ((capability.name, summary.promoted), (EXTRACT_NAME, summary.extract_promoted)) if not ok]
+    if closed:
+        tail = f"; {' and '.join(stopped)} stopped at the readiness gate" if stopped else ""
+        say(f"loop closed in {summary.elapsed_ms:.0f} ms: {steps} for {' and '.join(closed)}{tail}. The teacher stays.")
+    else:
+        say(f"loop stopped at the readiness gate in {summary.elapsed_ms:.0f} ms for both kinds. The teacher stays.")
     return summary
 
 
@@ -542,25 +543,32 @@ def _run_extract(
     stage("observe", observe=True)
     examples, report = generative_examples_from_traces(sink.read(capability.name), capability)
     summary.extract_examples = student.fit(examples) if hasattr(student, "fit") else 0
-    warm = stage("shadow-warm")
+    router.stats.reset_shadow()
+    stage("shadow-warm")
     summary.extract_platt = dict(calibrator.fit(list(sink.read(capability.name))))
-    summary.extract_verdict = readiness(warm.agreement, warm.questions, calibrator.is_fitted())
+    summary.extract_verdict = router.readiness().verdict
     say(f"verdict: {summary.extract_verdict}")
-    router.set_stage("canary")
-    stage("canary-50%")
-    router.set_stage("serve")
-    stage("serve")
+    try:
+        router.set_stage("canary")
+    except NotReady as exc:
+        say(f"canary: refused, {exc.readiness.verdict}; the loop stops here for {capability.name}")
+    else:
+        summary.extract_promoted = True
+        stage("canary-50%")
+        router.set_stage("serve")
+        stage("serve")
     summary.extract_trace_count = sum(1 for _ in sink.read(capability.name))
     say("")
     platt = "a={a:.2f} b={b:.2f}".format(**summary.extract_platt) if summary.extract_platt else "not fitted"
     say(f"calibrator: platt {platt}")
     say(f"labels: {report['examples']} System-2 outputs -> {summary.extract_examples} examples -> student fitted")
-    say(
-        f"served by System-1 in the serve stage: {summary.extract_served_by_system1}; the teacher would have "
-        f"disagreed on {summary.extract_confident_wrong} (confident-wrong)"
-    )
-    if not calibrator.is_fitted():
+    if summary.extract_promoted:
         say(
-            "the policy requires a fitted calibrator, so nothing was served: a student that copies its nearest "
-            "neighbour cannot extract, and Praxis says so instead of serving it"
+            f"served by System-1 in the serve stage: {summary.extract_served_by_system1}; the teacher would have "
+            f"disagreed on {summary.extract_confident_wrong} (confident-wrong)"
+        )
+    else:
+        say(
+            "nothing was served: a student that copies its nearest neighbour cannot extract, the verdict says "
+            "so, and the router refused to move past shadow instead of serving it"
         )

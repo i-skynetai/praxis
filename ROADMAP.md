@@ -77,7 +77,7 @@ Found by the first outside review of the committed tree (2026-10-01). One row at
 | ID | Feature | Area | P | Size | Status | Owner |
 |---|---|---|---|---|---|---|
 | PX-900 | [Safe by default: shadow stage, calibration required](#px-900) | router | P0 | S | Done | 0.3.2 |
-| PX-901 | [Readiness gate: `set_stage` refuses canary and serve until the verdict is ready](#px-901) | router | P1 | S | Ready | |
+| PX-901 | [Readiness gate: `set_stage` refuses canary and serve until the verdict is ready](#px-901) | router | P1 | S | Done | 0.3.2 |
 | PX-902 | [Remove the v0.1 modules; docs match the code; the demo picture is real output](#px-902) | docs | P1 | S | Ready | |
 
 ### 0.4.0 — trust the data, trust the eval (M2)
@@ -238,8 +238,8 @@ named a class that no longer exists and one example capability where two ship; t
 picture was drawn, not captured; the README's demo command needs `python3` outside a
 virtual environment. *Done when:* the v0.1 modules and their tests are gone and nothing
 excludes them from the checks; every doc line found above is fixed; `docs/images/demo.png`
-is rendered from the real output by a script kept beside it; the roadmap's last column
-is named for what it holds.
+is rendered from the real output by a script kept beside it; a test runs README steps
+2 to 5 as written; the roadmap's last column is named for what it holds.
 
 ### Adapters and providers
 
@@ -383,7 +383,9 @@ agreement, calibration error, confident-wrong rate, the offload share at the cur
 threshold, latency p50 and p95 for student and teacher, a throughput floor (one worker at
 p50, stated as a floor), and a verdict (`shadow` / `canary` / `serve`) against the v1.0
 gates with every missing item named ("need 140 more labels"); fixtures cover each
-verdict. *Starts in:* `praxis_core/cli.py`, `praxis_core/evaluate.py`.
+verdict. *Starts in:* `praxis_core/cli.py`, `praxis_core/evaluate.py`. The verdict itself
+exists since 0.3.2: `router.readiness()` (PX-901); `status` reads it for a running system
+from the sink instead of a live router.
 
 ### 0.6.0 — students and training rungs
 

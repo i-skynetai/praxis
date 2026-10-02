@@ -19,7 +19,7 @@ from praxis_core.contracts import (
     TraceEvent,
 )
 from praxis_core.providers.fake import MALFORMED_MODES, FakeCalibrator, FakeDecisionModel, FakeTeacher, FakeTraceSink
-from praxis_core.router import DecisionRouter, RoutingPolicy, TeacherError
+from praxis_core.router import DecisionRouter, NotReady, RoutingPolicy, TeacherError
 from tests.helpers import TicketGenerator, oracle, serving, triage_capability
 
 CAP = triage_capability()
@@ -371,6 +371,75 @@ class TheDefaultPolicyIsSafe(unittest.TestCase):
         self.assertTrue(all(r.answered_by == "system1" for r in fitted.decide_state(TICKET).values()))
 
 
+class PromotionIsGated(unittest.TestCase):
+    """PX-901. The stage is earned: ``set_stage`` up to canary or serve needs a ready verdict."""
+
+    def test_a_fresh_router_is_not_ready_and_set_stage_refuses(self):
+        router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5))
+        verdict = router.readiness()
+        self.assertFalse(verdict.ready)
+        self.assertEqual(len(verdict.missing), 3, verdict.missing)
+        self.assertTrue(verdict.verdict.startswith("stays in shadow"), verdict.verdict)
+        for stage in ("canary", "serve"):
+            with self.assertRaises(NotReady) as caught:
+                router.set_stage(stage)
+            self.assertIn("shadow comparisons", str(caught.exception))
+            self.assertEqual(caught.exception.readiness, verdict)
+        self.assertEqual(router.policy.stage, "shadow")
+        self.assertEqual(router.stats.forced_promotions, 0)
+
+    def test_enough_agreeing_shadow_calls_and_a_fitted_calibrator_earn_the_stage(self):
+        router, _, _ = make(
+            FakeDecisionModel(pick=oracle_key, peak=0.97),
+            calibrator=FakeCalibrator(fitted=True),
+            policy=RoutingPolicy(0.5),
+        )
+        for ticket in TicketGenerator(5).tickets(9):  # 27 comparisons: one short
+            router.decide_state(ticket)
+        self.assertEqual(router.readiness().missing, ("only 27 of 30 shadow comparisons",))
+        router.decide_state(TICKET)
+        verdict = router.readiness()
+        self.assertTrue(verdict.ready, verdict.verdict)
+        self.assertEqual((verdict.compared, verdict.agreement, verdict.calibrated), (30, 1.0, True))
+        router.set_stage("canary", canary_share=0.5)
+        router.set_stage("serve")
+        self.assertEqual(router.policy.stage, "serve")
+        router.set_stage("shadow")  # down is never refused
+        self.assertEqual(router.policy.stage, "shadow")
+
+    def test_the_thresholds_live_on_the_policy_and_the_opt_out_needs_no_calibrator(self):
+        router, _, _ = make(
+            FakeDecisionModel(pick=oracle_key, peak=0.97),
+            policy=RoutingPolicy(0.5, require_calibrated=False, min_shadow_compared=3, min_shadow_agreement=0.0),
+        )
+        self.assertFalse(router.readiness().ready)
+        router.decide_state(TICKET)
+        verdict = router.readiness()
+        self.assertTrue(verdict.ready, verdict.verdict)
+        self.assertIn("no calibrator required", verdict.verdict)
+        router.set_stage("serve")
+        self.assertEqual(router.policy.stage, "serve")
+        with self.assertRaises(ValueError):
+            RoutingPolicy(min_shadow_compared=0)
+        with self.assertRaises(ValueError):
+            RoutingPolicy(min_shadow_agreement=1.5)
+
+    def test_force_overrides_and_is_counted(self):
+        router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5))
+        router.set_stage("serve", force=True)
+        self.assertEqual(router.policy.stage, "serve")
+        self.assertEqual(router.stats.forced_promotions, 1)
+        self.assertEqual(router.stats.as_dict()["forced_promotions"], 1)
+
+    def test_reset_shadow_starts_the_count_again_for_a_refitted_student(self):
+        router, _, _ = make(FakeDecisionModel(pick=oracle_key, peak=0.97), policy=RoutingPolicy(0.5))
+        router.decide_state(TICKET)
+        self.assertEqual(router.readiness().compared, 3)
+        router.stats.reset_shadow()
+        self.assertEqual(router.readiness().compared, 0)
+        self.assertEqual(router.stats.questions, 3, "only the comparison count resets")
+
+
 class RequestsAreCheckedAgainstTheCapability(unittest.TestCase):
     def test_the_wrong_capability_is_a_caller_error(self):
         router, _, _ = make(None)
@@ -416,6 +485,7 @@ class StatsHaveAStableShape(unittest.TestCase):
                 "trace_failures",
                 "observed",
                 "observe_failures",
+                "forced_promotions",
             },
         )
 

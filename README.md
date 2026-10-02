@@ -101,7 +101,8 @@ sure about, the main model the rest:
 
 ```python
 router.calibrator.fit(list(sink.read("support.triage")))
-router.set_stage("canary", canary_share=0.2)
+print(router.readiness())                              # "ready: agreement 0.79 on 180, calibrator fitted"
+router.set_stage("canary", canary_share=0.2)           # refused with NotReady until that verdict is ready
 result = router.decide_state(ticket)["urgency"]        # .answer 2, .confidence 0.71, .answered_by "system1"
 ```
 
@@ -124,7 +125,7 @@ returns garbage can never fail your call. Details: [docs/architecture.md](docs/a
 - **Calibration built in**; by default nothing is served until a calibrator is fitted.
 - **Shadow, canary, serve**, with the main model as the permanent fallback.
 - **A replayable trace of every call**, JSONL or SQLite, behind a background queue.
-- **A readiness verdict** after shadow that names what is missing.
+- **A readiness verdict** after shadow; the stage cannot be raised until it is ready.
 - **A plug-in for any local model server**, as student or teacher.
 - **Every guarantee is a test**, named in [the architecture doc](docs/architecture.md#guarantees-and-the-test-that-proves-each).
 
