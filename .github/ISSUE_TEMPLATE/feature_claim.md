@@ -4,7 +4,7 @@ about: Take a Ready feature from ROADMAP.md
 title: "Claim PX-XXX: "
 ---
 
-**Feature** — the ID and name from [ROADMAP.md](https://github.com/arupmmi07/praxis/blob/main/ROADMAP.md), e.g. `PX-023 — HTTP
+**Feature** — the ID and name from [ROADMAP.md](https://github.com/i-skynetai/praxis/blob/main/ROADMAP.md), e.g. `PX-023 — HTTP
 adapter for the hosted decision API`.
 
 **Plan** — two or three sentences: what you will change, and the test you will add.

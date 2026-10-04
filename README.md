@@ -1,6 +1,6 @@
 # Praxis
 
-[![tests](https://github.com/arupmmi07/praxis/actions/workflows/tests.yml/badge.svg)](https://github.com/arupmmi07/praxis/actions/workflows/tests.yml)
+[![tests](https://github.com/i-skynetai/praxis/actions/workflows/tests.yml/badge.svg)](https://github.com/i-skynetai/praxis/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/downloads/)
 [![licence](https://img.shields.io/badge/licence-Apache%202.0-blue)](LICENSE)
 
@@ -40,7 +40,7 @@ No install, no keys. Two example capabilities over synthetic tickets, a keyword 
 the big model.
 
 ```bash
-git clone https://github.com/arupmmi07/praxis.git
+git clone https://github.com/i-skynetai/praxis.git
 cd praxis
 python3 -m praxis_core demo
 ```
